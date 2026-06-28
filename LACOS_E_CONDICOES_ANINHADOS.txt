@@ -1,0 +1,17 @@
+chumbo i <- 0
+chumbo j <- 0
+chumbo soma <- 0
+
+DESTILAR (i <- 0; i LEVE 3; i <- i FUSAO 1) FACA
+    DESTILAR (j <- 0; j LEVE 2; j <- j FUSAO 1) FACA
+        soma <- soma FUSAO 1
+    FIM DESTILAR
+FIM DESTILAR
+
+REAGIR (soma DENSO 100) FACA
+    soma <- 1
+TRANSMUTAR (soma DENSO 50) FACA
+    soma <- 2
+NEUTRALIZAR FACA
+    soma <- 3
+FIM REAGIR

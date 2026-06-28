@@ -1,0 +1,11 @@
+|| Arquivo de teste sintaticamente incorreto da linguagem Alchemia
+
+chumbo vida <- 100
+chumbo resultado <- 0
+mercurio taxa <- 3.14
+elixir vivo <- verdade
+runa inicial <- 'A'
+
+CATALISAR FACA
+    resultado <- resultado EXTRATO 2
+FIM CATALISAR resultado DENSO OU PURO 10

@@ -1,0 +1,11 @@
+|| Arquivo de teste da linguagem Alchemia
+
+chumbo vida <- 100
+chumbo resultado <- 0
+mercurio taxa <- 3.14
+elixir vivo <- verdade
+runa inicial <- 'A'
+
+REAGIR (resultado LEVE OU PURO 100) FACA
+    resultado <- resultado FUSAO 1
+FIM REAGIR

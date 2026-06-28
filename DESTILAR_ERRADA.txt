@@ -1,0 +1,11 @@
+|| Arquivo de teste sintaticamente incorreto da linguagem Alchemia
+
+chumbo vida <- 100
+chumbo resultado <- 0
+mercurio taxa <- 3.14
+elixir vivo <- verdade
+runa inicial <- 'A'
+
+DESTILAR i <- 0; i LEVE 5; i <- i FUSAO 1 FACA
+    resultado <- resultado FUSAO i
+FIM DESTILAR

@@ -1,0 +1,16 @@
+|| Teste de erros semanticos
+
+chumbo idade <- 10
+mercurio nota <- 8.5
+elixir aprovado <- verdade
+runa letra <- 'X'
+
+idade <- nota
+aprovado <- idade
+nota <- aprovado FUSAO 2
+naoexiste <- 5
+chumbo idade <- 20
+
+REAGIR (idade FUSAO 1) FACA
+    nota <- 9.0
+FIM REAGIR

@@ -1,0 +1,736 @@
+
+=== CATALISAR.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: CATALISAR FACA
+10:     resultado <- resultado EXTRATO 2
+11: FIM CATALISAR (resultado DENSO OU PURO 10)
+
+-------------------------------
+
+
+====================================
+        TABELA DE SÍMBOLOS          
+====================================
+IDENTIFICADOR        | TIPO RECONHECIDO
+------------------------------------
+vida                 | chumbo         
+resultado            | chumbo         
+taxa                 | mercurio       
+vivo                 | elixir         
+inicial              | runa           
+====================================
+
+Programa sintaticamente correto
+
+Analise semantica: nenhum erro encontrado.
+
+
+=== CODIGO INTERMEDIARIO (TRES ENDERECOS) ===
+    vida = 100
+    resultado = 0
+    taxa = 3.14
+    vivo = 1
+    inicial = 'A'
+L0:
+    t0 = resultado / 2
+    resultado = t0
+    t1 = resultado >= 10
+    if t1 goto L0
+==============================================
+
+=== CATALISAR_ERRADA.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste sintaticamente incorreto da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: CATALISAR FACA
+10:     resultado <- resultado EXTRATO 2
+11: FIM CATALISAR resultado DENSO OU PURO 10
+
+-------------------------------
+
+
+=== DESTILAR.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: DESTILAR (i <- 0; i LEVE 5; i <- i FUSAO 1) FACA
+10:     resultado <- resultado FUSAO i
+11: FIM DESTILAR
+
+-------------------------------
+
+
+====================================
+        TABELA DE SÍMBOLOS          
+====================================
+IDENTIFICADOR        | TIPO RECONHECIDO
+------------------------------------
+vida                 | chumbo         
+resultado            | chumbo         
+taxa                 | mercurio       
+vivo                 | elixir         
+inicial              | runa           
+====================================
+
+Programa sintaticamente correto
+
+=== ANALISE SEMANTICA: 5 ERRO(S) ENCONTRADO(S) ===
+Erro semantico (linha 9): variavel "i" nao foi declarada
+Erro semantico (linha 9): variavel "i" nao foi declarada
+Erro semantico (linha 9): variavel "i" nao foi declarada
+Erro semantico (linha 9): variavel "i" nao foi declarada
+Erro semantico (linha 10): variavel "i" nao foi declarada
+
+
+=== CODIGO INTERMEDIARIO (TRES ENDERECOS) ===
+    vida = 100
+    resultado = 0
+    taxa = 3.14
+    vivo = 1
+    inicial = 'A'
+    i = 0
+L0:
+    t0 = i < 5
+    ifFalse t0 goto L1
+    t2 = resultado + i
+    resultado = t2
+    t1 = i + 1
+    i = t1
+    goto L0
+L1:
+==============================================
+
+=== DESTILAR_ERRADA.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste sintaticamente incorreto da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: DESTILAR i <- 0; i LEVE 5; i <- i FUSAO 1 FACA
+10:     resultado <- resultado FUSAO i
+11: FIM DESTILAR
+
+-------------------------------
+
+
+=== DESTILAR_TP3.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste TP3: laco DESTILAR (for) com a variavel
+2: || de controle corretamente declarada antes do laco
+3: 
+4: chumbo vida <- 100
+5: chumbo resultado <- 0
+6: chumbo i <- 0
+7: 
+8: DESTILAR (i <- 0; i LEVE 5; i <- i FUSAO 1) FACA
+9:     resultado <- resultado FUSAO i
+10: FIM DESTILAR
+
+-------------------------------
+
+
+====================================
+        TABELA DE SÍMBOLOS          
+====================================
+IDENTIFICADOR        | TIPO RECONHECIDO
+------------------------------------
+vida                 | chumbo         
+resultado            | chumbo         
+i                    | chumbo         
+====================================
+
+Programa sintaticamente correto
+
+Analise semantica: nenhum erro encontrado.
+
+
+=== CODIGO INTERMEDIARIO (TRES ENDERECOS) ===
+    vida = 100
+    resultado = 0
+    i = 0
+    i = 0
+L0:
+    t0 = i < 5
+    ifFalse t0 goto L1
+    t2 = resultado + i
+    resultado = t2
+    t1 = i + 1
+    i = t1
+    goto L0
+L1:
+==============================================
+
+=== ERROS_SEMANTICOS.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Teste de erros semanticos
+2: 
+3: chumbo idade <- 10
+4: mercurio nota <- 8.5
+5: elixir aprovado <- verdade
+6: runa letra <- 'X'
+7: 
+8: idade <- nota
+9: aprovado <- idade
+10: nota <- aprovado FUSAO 2
+11: naoexiste <- 5
+12: chumbo idade <- 20
+13: 
+14: REAGIR (idade FUSAO 1) FACA
+15:     nota <- 9.0
+16: FIM REAGIR
+
+-------------------------------
+
+
+====================================
+        TABELA DE SÍMBOLOS          
+====================================
+IDENTIFICADOR        | TIPO RECONHECIDO
+------------------------------------
+idade                | chumbo         
+nota                 | mercurio       
+aprovado             | elixir         
+letra                | runa           
+====================================
+
+Programa sintaticamente correto
+
+=== ANALISE SEMANTICA: 6 ERRO(S) ENCONTRADO(S) ===
+Erro semantico (linha 9): tipos incompativeis na atribuicao a "idade": esperado "chumbo", recebido "mercurio"
+Erro semantico (linha 10): tipos incompativeis na atribuicao a "aprovado": esperado "elixir", recebido "chumbo"
+Erro semantico (linha 11): operador "+" exige operandos numericos (chumbo ou mercurio); recebidos "elixir" e "chumbo"
+Erro semantico (linha 12): variavel "naoexiste" nao foi declarada
+Erro semantico (linha 14): variavel "idade" ja foi declarada
+Erro semantico (linha 14): a condicao deve ser do tipo elixir (booleano), mas é do tipo "chumbo"
+
+
+=== CODIGO INTERMEDIARIO (TRES ENDERECOS) ===
+    idade = 10
+    nota = 8.5
+    aprovado = 1
+    letra = 'X'
+    idade = nota
+    aprovado = idade
+    t0 = aprovado + 2
+    nota = t0
+    naoexiste = 5
+    idade = 20
+    t1 = idade + 1
+    ifFalse t1 goto L0
+    nota = 9.0
+    goto L1
+L0:
+L1:
+==============================================
+
+=== FERMENTAR.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: FERMENTAR (resultado DENSO 30) FACA
+10:     resultado <- resultado CORROSAO 5
+11:     taxa <- taxa CATALISADOR 1.5
+12: FIM FERMENTAR
+
+-------------------------------
+
+
+====================================
+        TABELA DE SÍMBOLOS          
+====================================
+IDENTIFICADOR        | TIPO RECONHECIDO
+------------------------------------
+vida                 | chumbo         
+resultado            | chumbo         
+taxa                 | mercurio       
+vivo                 | elixir         
+inicial              | runa           
+====================================
+
+Programa sintaticamente correto
+
+Analise semantica: nenhum erro encontrado.
+
+
+=== CODIGO INTERMEDIARIO (TRES ENDERECOS) ===
+    vida = 100
+    resultado = 0
+    taxa = 3.14
+    vivo = 1
+    inicial = 'A'
+L0:
+    t0 = resultado > 30
+    ifFalse t0 goto L1
+    t1 = resultado - 5
+    resultado = t1
+    t2 = taxa * 1.5
+    taxa = t2
+    goto L0
+L1:
+==============================================
+
+=== FERMENTAR_ERRADA.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste sintaticamente incorreto da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: FERMENTAR resultado DENSO 30 FACA
+10:     resultado <- resultado CORROSAO 5
+11:     taxa <- taxa CATALISADOR 1.5
+12: FIM FERMENTAR
+
+-------------------------------
+
+
+=== FUSAO.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: REAGIR (resultado LEVE OU PURO 100) FACA
+10:     resultado <- resultado FUSAO 1
+11: FIM REAGIR
+-------------------------------
+
+
+====================================
+        TABELA DE SÍMBOLOS          
+====================================
+IDENTIFICADOR        | TIPO RECONHECIDO
+------------------------------------
+vida                 | chumbo         
+resultado            | chumbo         
+taxa                 | mercurio       
+vivo                 | elixir         
+inicial              | runa           
+====================================
+
+Programa sintaticamente correto
+
+Analise semantica: nenhum erro encontrado.
+
+
+=== CODIGO INTERMEDIARIO (TRES ENDERECOS) ===
+    vida = 100
+    resultado = 0
+    taxa = 3.14
+    vivo = 1
+    inicial = 'A'
+    t0 = resultado <= 100
+    ifFalse t0 goto L0
+    t1 = resultado + 1
+    resultado = t1
+    goto L1
+L0:
+L1:
+==============================================
+
+=== FUSAO_ERRADA.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste sintaticamente incorreto da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: REAGIR (resultado LEVE OU PURO 100) FACA
+10:     resultado <- resultado FUSAO
+11: FIM REAGIR
+
+-------------------------------
+
+
+=== IMPURO.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: REAGIR (resultado IMPURO 0) FACA
+10:     resultado <- resultado RESIDUO 3
+11: FIM REAGIR
+-------------------------------
+
+
+====================================
+        TABELA DE SÍMBOLOS          
+====================================
+IDENTIFICADOR        | TIPO RECONHECIDO
+------------------------------------
+vida                 | chumbo         
+resultado            | chumbo         
+taxa                 | mercurio       
+vivo                 | elixir         
+inicial              | runa           
+====================================
+
+Programa sintaticamente correto
+
+Analise semantica: nenhum erro encontrado.
+
+
+=== CODIGO INTERMEDIARIO (TRES ENDERECOS) ===
+    vida = 100
+    resultado = 0
+    taxa = 3.14
+    vivo = 1
+    inicial = 'A'
+    t0 = resultado != 0
+    ifFalse t0 goto L0
+    t1 = resultado % 3
+    resultado = t1
+    goto L1
+L0:
+L1:
+==============================================
+
+=== IMPURO_ERRADA.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste sintaticamente incorreto da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: REAGIR (resultado IMPURO) FACA
+10:     resultado <- resultado RESIDUO 3
+11: FIM REAGIR
+
+-------------------------------
+
+
+=== LACOS_E_CONDICOES_ANINHADOS.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: chumbo i <- 0
+2: chumbo j <- 0
+3: chumbo soma <- 0
+4: 
+5: DESTILAR (i <- 0; i LEVE 3; i <- i FUSAO 1) FACA
+6:     DESTILAR (j <- 0; j LEVE 2; j <- j FUSAO 1) FACA
+7:         soma <- soma FUSAO 1
+8:     FIM DESTILAR
+9: FIM DESTILAR
+10: 
+11: REAGIR (soma DENSO 100) FACA
+12:     soma <- 1
+13: TRANSMUTAR (soma DENSO 50) FACA
+14:     soma <- 2
+15: NEUTRALIZAR FACA
+16:     soma <- 3
+17: FIM REAGIR
+
+-------------------------------
+
+
+====================================
+        TABELA DE SÍMBOLOS          
+====================================
+IDENTIFICADOR        | TIPO RECONHECIDO
+------------------------------------
+i                    | chumbo         
+j                    | chumbo         
+soma                 | chumbo         
+====================================
+
+Programa sintaticamente correto
+
+Analise semantica: nenhum erro encontrado.
+
+
+=== CODIGO INTERMEDIARIO (TRES ENDERECOS) ===
+    i = 0
+    j = 0
+    soma = 0
+    i = 0
+L0:
+    t0 = i < 3
+    ifFalse t0 goto L1
+    j = 0
+L2:
+    t2 = j < 2
+    ifFalse t2 goto L3
+    t4 = soma + 1
+    soma = t4
+    t3 = j + 1
+    j = t3
+    goto L2
+L3:
+    t1 = i + 1
+    i = t1
+    goto L0
+L1:
+    t5 = soma > 100
+    ifFalse t5 goto L4
+    soma = 1
+    goto L5
+L4:
+    t6 = soma > 50
+    ifFalse t6 goto L6
+    soma = 2
+    goto L5
+L6:
+    soma = 3
+L5:
+==============================================
+
+=== REAGIR.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: REAGIR (vida DENSO 0) FACA
+10:     resultado <- vida FUSAO 10
+11: FIM REAGIR
+12: 
+
+-------------------------------
+
+
+====================================
+        TABELA DE SÍMBOLOS          
+====================================
+IDENTIFICADOR        | TIPO RECONHECIDO
+------------------------------------
+vida                 | chumbo         
+resultado            | chumbo         
+taxa                 | mercurio       
+vivo                 | elixir         
+inicial              | runa           
+====================================
+
+Programa sintaticamente correto
+
+Analise semantica: nenhum erro encontrado.
+
+
+=== CODIGO INTERMEDIARIO (TRES ENDERECOS) ===
+    vida = 100
+    resultado = 0
+    taxa = 3.14
+    vivo = 1
+    inicial = 'A'
+    t0 = vida > 0
+    ifFalse t0 goto L0
+    t1 = vida + 10
+    resultado = t1
+    goto L1
+L0:
+L1:
+==============================================
+
+=== REAGIR_ERRADA.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste sintaticamente incorreto da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: REAGIR (vida DENSO 0 FACA
+10:     resultado <- vida FUSAO 10
+11: FIM REAGIR
+
+-------------------------------
+
+
+=== TRANSMUTAR.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: REAGIR (resultado PURO 110) FACA 
+10:     resultado <- resultado CORROSAO 5
+11: TRANSMUTAR (resultado LEVE 100 AMALGAMA taxa DENSO 2.0) FACA
+12:     resultado <- resultado FUSAO 50
+13: NEUTRALIZAR FACA
+14:     resultado <- 0
+15: FIM REAGIR
+-------------------------------
+
+
+====================================
+        TABELA DE SÍMBOLOS          
+====================================
+IDENTIFICADOR        | TIPO RECONHECIDO
+------------------------------------
+vida                 | chumbo         
+resultado            | chumbo         
+taxa                 | mercurio       
+vivo                 | elixir         
+inicial              | runa           
+====================================
+
+Programa sintaticamente correto
+
+Analise semantica: nenhum erro encontrado.
+
+
+=== CODIGO INTERMEDIARIO (TRES ENDERECOS) ===
+    vida = 100
+    resultado = 0
+    taxa = 3.14
+    vivo = 1
+    inicial = 'A'
+    t0 = resultado == 110
+    ifFalse t0 goto L0
+    t1 = resultado - 5
+    resultado = t1
+    goto L1
+L0:
+    t2 = resultado < 100
+    t3 = taxa > 2.0
+    t4 = t2 && t3
+    ifFalse t4 goto L2
+    t5 = resultado + 50
+    resultado = t5
+    goto L1
+L2:
+    resultado = 0
+L1:
+==============================================
+
+=== TRANSMUTAR_ERRADA.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste sintaticamente incorreto da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: REAGIR (resultado PURO 110) FACA
+10:     resultado <- resultado CORROSAO 5
+11: TRANSMUTAR (resultado LEVE 100 AMALGAMA taxa DENSO 2.0)
+12:     resultado <- resultado FUSAO 50
+13: NEUTRALIZAR FACA
+14:     resultado <- 0
+15: FIM REAGIR
+
+-------------------------------
+
+
+=== VAPOR.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial  <- 'A'
+8: 
+9: REAGIR (vivo VAPOR falso) FACA
+10:     vivo <- OPOSTO falso
+11: FIM REAGIR
+-------------------------------
+
+
+====================================
+        TABELA DE SÍMBOLOS          
+====================================
+IDENTIFICADOR        | TIPO RECONHECIDO
+------------------------------------
+vida                 | chumbo         
+resultado            | chumbo         
+taxa                 | mercurio       
+vivo                 | elixir         
+inicial              | runa           
+====================================
+
+Programa sintaticamente correto
+
+Analise semantica: nenhum erro encontrado.
+
+
+=== CODIGO INTERMEDIARIO (TRES ENDERECOS) ===
+    vida = 100
+    resultado = 0
+    taxa = 3.14
+    vivo = 1
+    inicial = 'A'
+    t0 = vivo || 0
+    ifFalse t0 goto L0
+    t1 = ! 0
+    vivo = t1
+    goto L1
+L0:
+L1:
+==============================================
+
+=== VAPOR_ERRADA.txt ===
+--- PROGRAMA FONTE NUMERADO ---
+1: || Arquivo de teste sintaticamente incorreto da linguagem Alchemia
+2: 
+3: chumbo vida <- 100
+4: chumbo resultado <- 0
+5: mercurio taxa <- 3.14
+6: elixir vivo <- verdade
+7: runa inicial <- 'A'
+8: 
+9: REAGIR (vivo VAPOR) FACA
+10:     vivo <- OPOSTO falso
+11: FIM REAGIR
+
+-------------------------------
+

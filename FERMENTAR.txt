@@ -1,0 +1,12 @@
+|| Arquivo de teste da linguagem Alchemia
+
+chumbo vida <- 100
+chumbo resultado <- 0
+mercurio taxa <- 3.14
+elixir vivo <- verdade
+runa inicial <- 'A'
+
+FERMENTAR (resultado DENSO 30) FACA
+    resultado <- resultado CORROSAO 5
+    taxa <- taxa CATALISADOR 1.5
+FIM FERMENTAR
