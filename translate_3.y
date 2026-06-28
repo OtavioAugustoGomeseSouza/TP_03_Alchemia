@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 extern int linha_atual;
 extern char *yytext;
@@ -10,6 +11,7 @@ extern FILE *yyin;
 
 int yylex(void);
 void yyerror(const char *s);
+void imprimir_codigo_objeto(void);
 
 /* ===================== TABELA DE SIMBOLOS ===================== */
 
@@ -150,30 +152,125 @@ int tipos_compativeis(const char *destino, const char *origem) {
     return 0;
 }
 
-/* ===================== GERACAO DE ASSEMBLY MOS6502 ================= */
+/* ===================== SIMULADOR RESTRITO MOS 6502 ================= */
 
-typedef struct { char name[64]; unsigned char addr; } Addr6502;
-static Addr6502 addr6502[256];
-static int addr6502_count = 0;
-static unsigned char next_zp_addr = 0x00;
-static int asm_label_id = 0;
+// Função auxiliar para carregar um operando no Acumulador (A)
+void mos6502_carregar_acumulador(const char *operando) {
+    if (isdigit(operando[0]) || operando[0] == '-' || operando[0] == '+' || operando[0] == '\'') {
+        printf("    LDA #%s\n", operando); // Carrega valor imediato (literal)
+    } else {
+        printf("    LDA %s\n", operando);   // Carrega direto da memória (variável ou temporário)
+    }
+}
 
-unsigned char get_zp_addr(const char *name);
-int is_int_literal(const char *s);
-int is_float_literal(const char *s);
-int is_char_literal(const char *s);
-int literal_to_byte(const char *s);
-void emit_load(FILE *f, const char *operand);
-void emit_cmp_op(FILE *f, const char *operand);
-void emit_adc_op(FILE *f, const char *operand);
-void emit_sbc_op(FILE *f, const char *operand);
-void emit_comparison(FILE *f, const char *dst, const char *a, const char *b, const char *oper);
-void emit_multiply(FILE *f, const char *dst, const char *a, const char *b);
-void emit_divide(FILE *f, const char *dst, const char *a, const char *b);
-void emit_modulo(FILE *f, const char *dst, const char *a, const char *b);
-void emit_and(FILE *f, const char *dst, const char *a, const char *b);
-void emit_or(FILE *f, const char *dst, const char *a, const char *b);
-void gerar_assembly_6502(const char *filename);
+void traduzir_instrucao_objeto(char *linha) {
+    char l_limpa[TAC_LINE_LEN];
+    strcpy(l_limpa, linha);
+    
+    int tam = strlen(l_limpa);
+    if (tam > 0 && l_limpa[tam - 1] == ':') {
+        printf("%s\n", l_limpa);
+        return;
+    }
+
+    char arg1[64] = "", op[64] = "", arg2[64] = "", arg3[64] = "", arg4[64] = "";
+    int tokens = sscanf(l_limpa, "%s %s %s %s %s", arg1, op, arg2, arg3, arg4);
+
+    if (tokens <= 0) return;
+
+    // Comando de Desvio Incondicional (JUMP)
+    if (strcmp(arg1, "goto") == 0) {
+        printf("    JMP %s\n", op);
+        return;
+    }
+
+    // Comandos de Desvio Condicional baseados em Flags do 6502
+    if (strcmp(arg1, "ifFalse") == 0) {
+        // No 6502, testamos o valor carregando-o e verificando se é zero
+        printf("    LDA %s\n", op);
+        printf("    BEQ %s\n", arg4); // Branch if Equal (Desvia se for falso/zero)
+        return;
+    }
+    if (strcmp(arg1, "if") == 0) {
+        printf("    LDA %s\n", op);
+        printf("    BNE %s\n", arg4); // Branch if Not Equal (Desvia se for verdadeiro/não-zero)
+        return;
+    }
+
+    // Operações de Atribuição e Aritmética Baseadas em Acumulador (A)
+    if (strcmp(op, "=") == 0) {
+        // Atribuição Simples: var = operando
+        if (tokens == 3) {
+            mos6502_carregar_acumulador(arg2);
+            printf("    STA %s\n", arg1); // Salva o Acumulador na memória de destino
+        } 
+        // Operação Unária: var = !operando (NOT lógico)
+        else if (tokens == 4 && strcmp(arg2, "!") == 0) {
+            printf("    LDA %s\n", arg3);
+            printf("    EOR #$FF\n"); // Inverte os bits usando OU Exclusivo (XOR) no Acumulador
+            printf("    STA %s\n", arg1);
+        }
+        // Operações Binárias de Três Endereços convertidas para Acumulador
+        else if (tokens == 5) {
+            // Passo 1: O primeiro operando obrigatoriamente vai para o Acumulador
+            mos6502_carregar_acumulador(arg2);
+
+            // Passo 2: Executa a operação matemática correspondente do 6502
+            if (strcmp(arg3, "+") == 0) {
+                printf("    CLC\n"); // Limpa o Carry Flag (obrigatório antes de ADC)
+                if (isdigit(arg4[0])) printf("    ADC #%s\n", arg4);
+                else printf("    ADC %s\n", arg4);
+            }
+            else if (strcmp(arg3, "-") == 0) {
+                printf("    SEC\n"); // Seta o Carry Flag (obrigatório antes de SBC)
+                if (isdigit(arg4[0])) printf("    SBC #%s\n", arg4);
+                else printf("    SBC %s\n", arg4);
+            }
+            else if (strcmp(arg3, "*") == 0 || strcmp(arg3, "/") == 0 || strcmp(arg3, "%") == 0) {
+                // O MOS 6502 original não tem multiplicação/divisão via hardware!
+                // Simulamos chamando uma subrotina dedicada (Subroutine)
+                if (strcmp(arg3, "*") == 0) {
+                    printf("    LDX %s\n", arg4); // Usa o registrador X para passar o multiplicador
+                    printf("    JSR MULTIPLICAR_6502\n");
+                } else {
+                    printf("    LDX %s\n", arg4);
+                    printf("    JSR DIVIDIR_6502\n");
+                }
+            }
+            // Comparações lógicas (Geram flags de desvio)
+            else if (strcmp(arg3, "==") == 0 || strcmp(arg3, "!=") == 0 || 
+                     strcmp(arg3, ">") == 0  || strcmp(arg3, "<") == 0 || 
+                     strcmp(arg3, ">=") == 0 || strcmp(arg3, "<=") == 0) {
+                
+                if (isdigit(arg4[0])) printf("    CMP #%s\n", arg4);
+                else printf("    CMP %s\n", arg4);
+                
+                // Transforma o resultado da comparação em um valor booleano (0 ou 1) no Acumulador
+                char label_fim[16];
+                sprintf(label_fim, ".Cmp%d", rand() % 1000);
+                
+                if (strcmp(arg3, "==") == 0) {
+                    printf("    BEQ .SetTrue%s\n", label_fim);
+                } else if (strcmp(arg3, "!=") == 0) {
+                    printf("    BNE .SetTrue%s\n", label_fim);
+                } else if (strcmp(arg3, ">") == 0) {
+                    printf("    BPL .SetTrue%s\n", label_fim); // Verifica flag positivo
+                } else if (strcmp(arg3, "<") == 0) {
+                    printf("    BMI .SetTrue%s\n", label_fim); // Verifica flag negativo
+                }
+                
+                printf("    LDA #0\n"); // Falso
+                printf("    JMP .Fim%s\n", label_fim);
+                printf(".SetTrue%s:\n", label_fim);
+                printf("    LDA #1\n"); // Verdadeiro
+                printf(".Fim%s:\n", label_fim);
+            }
+
+            // Passo 3: Salva o resultado final que restou no Acumulador na memória estável
+            printf("    STA %s\n", arg1);
+        }
+    }
+}
 
 %}
 
@@ -481,351 +578,6 @@ expressao:
 
 %%
 
-/* ================================================================== */
-/*               IMPLEMENTACAO — GERACAO DE ASSEMBLY MOS6502          */
-/* ================================================================== */
-
-unsigned char get_zp_addr(const char *name) {
-    int i;
-    for (i = 0; i < addr6502_count; i++)
-        if (strcmp(addr6502[i].name, name) == 0)
-            return addr6502[i].addr;
-    strncpy(addr6502[addr6502_count].name, name, 63);
-    addr6502[addr6502_count].name[63] = '\0';
-    addr6502[addr6502_count].addr = next_zp_addr;
-    addr6502_count++;
-    return next_zp_addr++;
-}
-
-int is_int_literal(const char *s) {
-    const char *p = s;
-    if (!p || !*p) return 0;
-    if (*p == '+' || *p == '-') p++;
-    if (!*p) return 0;
-    for (; *p; p++) if (*p < '0' || *p > '9') return 0;
-    return 1;
-}
-
-int is_float_literal(const char *s) {
-    const char *p = s;
-    int has_dot = 0;
-    if (!p || !*p) return 0;
-    if (*p == '+' || *p == '-') p++;
-    for (; *p; p++) {
-        if (*p == '.') { has_dot = 1; continue; }
-        if (*p < '0' || *p > '9') return 0;
-    }
-    return has_dot;
-}
-
-int is_char_literal(const char *s) {
-    return s && s[0] == '\'';
-}
-
-int literal_to_byte(const char *s) {
-    if (is_char_literal(s)) return (unsigned char)s[1];
-    return (int)atof(s) & 0xFF;
-}
-
-void emit_load(FILE *f, const char *operand) {
-    if (is_int_literal(operand) || is_char_literal(operand)) {
-        fprintf(f, "  LDA #%d\n", literal_to_byte(operand));
-    } else if (is_float_literal(operand)) {
-        fprintf(f, "  LDA #%d  ; %.10s (float truncado para inteiro)\n",
-                literal_to_byte(operand), operand);
-    } else {
-        fprintf(f, "  LDA $%02X  ; %s\n", get_zp_addr(operand), operand);
-    }
-}
-
-void emit_cmp_op(FILE *f, const char *operand) {
-    if (is_int_literal(operand) || is_float_literal(operand) || is_char_literal(operand))
-        fprintf(f, "  CMP #%d\n", literal_to_byte(operand));
-    else
-        fprintf(f, "  CMP $%02X  ; %s\n", get_zp_addr(operand), operand);
-}
-
-void emit_adc_op(FILE *f, const char *operand) {
-    if (is_int_literal(operand) || is_float_literal(operand) || is_char_literal(operand))
-        fprintf(f, "  ADC #%d\n", literal_to_byte(operand));
-    else
-        fprintf(f, "  ADC $%02X  ; %s\n", get_zp_addr(operand), operand);
-}
-
-void emit_sbc_op(FILE *f, const char *operand) {
-    if (is_int_literal(operand) || is_float_literal(operand) || is_char_literal(operand))
-        fprintf(f, "  SBC #%d\n", literal_to_byte(operand));
-    else
-        fprintf(f, "  SBC $%02X  ; %s\n", get_zp_addr(operand), operand);
-}
-
-void emit_comparison(FILE *f, const char *dst, const char *a, const char *b, const char *oper) {
-    int id = asm_label_id++;
-    fprintf(f, "  ; %s = %s %s %s\n", dst, a, oper, b);
-    emit_load(f, a);
-    emit_cmp_op(f, b);
-    if (strcmp(oper, "==") == 0) {
-        fprintf(f, "  BEQ _cmp_true_%d\n", id);
-    } else if (strcmp(oper, "!=") == 0) {
-        fprintf(f, "  BNE _cmp_true_%d\n", id);
-    } else if (strcmp(oper, "<") == 0) {
-        fprintf(f, "  BCC _cmp_true_%d\n", id);
-    } else if (strcmp(oper, ">=") == 0) {
-        fprintf(f, "  BCS _cmp_true_%d\n", id);
-    } else if (strcmp(oper, ">") == 0) {
-        /* a > b: igual => falso, carry set e nao igual => verdadeiro */
-        fprintf(f, "  BEQ _cmp_false_%d\n", id);
-        fprintf(f, "  BCS _cmp_true_%d\n", id);
-    } else if (strcmp(oper, "<=") == 0) {
-        /* a <= b: menor ou igual => verdadeiro */
-        fprintf(f, "  BCC _cmp_true_%d\n", id);
-        fprintf(f, "  BEQ _cmp_true_%d\n", id);
-    }
-    fprintf(f, "_cmp_false_%d:\n", id);
-    fprintf(f, "  LDA #0\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "  JMP _cmp_end_%d\n", id);
-    fprintf(f, "_cmp_true_%d:\n", id);
-    fprintf(f, "  LDA #1\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "_cmp_end_%d:\n", id);
-}
-
-void emit_multiply(FILE *f, const char *dst, const char *a, const char *b) {
-    int id = asm_label_id++;
-    fprintf(f, "  ; %s = %s * %s (adicao repetida — funciona para valores 0-255)\n", dst, a, b);
-    fprintf(f, "  LDA #0\n");
-    fprintf(f, "  STA $%02X  ; %s = 0\n", get_zp_addr(dst), dst);
-    if (is_int_literal(b) || is_float_literal(b) || is_char_literal(b))
-        fprintf(f, "  LDX #%d\n", literal_to_byte(b));
-    else
-        fprintf(f, "  LDX $%02X  ; %s\n", get_zp_addr(b), b);
-    fprintf(f, "_mult_loop_%d:\n", id);
-    fprintf(f, "  CPX #0\n");
-    fprintf(f, "  BEQ _mult_end_%d\n", id);
-    fprintf(f, "  CLC\n");
-    fprintf(f, "  LDA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    emit_adc_op(f, a);
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "  DEX\n");
-    fprintf(f, "  JMP _mult_loop_%d\n", id);
-    fprintf(f, "_mult_end_%d:\n", id);
-}
-
-void emit_divide(FILE *f, const char *dst, const char *a, const char *b) {
-    int id = asm_label_id++;
-    unsigned char num_addr = get_zp_addr("__div_num");
-    fprintf(f, "  ; %s = %s / %s (subtracao repetida — sem divisao por zero)\n", dst, a, b);
-    emit_load(f, a);
-    fprintf(f, "  STA $%02X  ; __div_num\n", num_addr);
-    fprintf(f, "  LDA #0\n");
-    fprintf(f, "  STA $%02X  ; %s = 0\n", get_zp_addr(dst), dst);
-    fprintf(f, "_div_loop_%d:\n", id);
-    fprintf(f, "  LDA $%02X  ; __div_num\n", num_addr);
-    emit_cmp_op(f, b);
-    fprintf(f, "  BCC _div_end_%d\n", id);
-    fprintf(f, "  SEC\n");
-    emit_sbc_op(f, b);
-    fprintf(f, "  STA $%02X  ; __div_num\n", num_addr);
-    fprintf(f, "  INC $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "  JMP _div_loop_%d\n", id);
-    fprintf(f, "_div_end_%d:\n", id);
-}
-
-void emit_modulo(FILE *f, const char *dst, const char *a, const char *b) {
-    int id = asm_label_id++;
-    unsigned char num_addr = get_zp_addr("__mod_num");
-    fprintf(f, "  ; %s = %s %% %s (subtracao repetida)\n", dst, a, b);
-    emit_load(f, a);
-    fprintf(f, "  STA $%02X  ; __mod_num\n", num_addr);
-    fprintf(f, "_mod_loop_%d:\n", id);
-    fprintf(f, "  LDA $%02X  ; __mod_num\n", num_addr);
-    emit_cmp_op(f, b);
-    fprintf(f, "  BCC _mod_end_%d\n", id);
-    fprintf(f, "  SEC\n");
-    emit_sbc_op(f, b);
-    fprintf(f, "  STA $%02X  ; __mod_num\n", num_addr);
-    fprintf(f, "  JMP _mod_loop_%d\n", id);
-    fprintf(f, "_mod_end_%d:\n", id);
-    fprintf(f, "  LDA $%02X  ; __mod_num\n", num_addr);
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-}
-
-void emit_and(FILE *f, const char *dst, const char *a, const char *b) {
-    int id = asm_label_id++;
-    fprintf(f, "  ; %s = %s && %s\n", dst, a, b);
-    emit_load(f, a);
-    fprintf(f, "  BEQ _and_false_%d\n", id);
-    emit_load(f, b);
-    fprintf(f, "  BEQ _and_false_%d\n", id);
-    fprintf(f, "  LDA #1\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "  JMP _and_end_%d\n", id);
-    fprintf(f, "_and_false_%d:\n", id);
-    fprintf(f, "  LDA #0\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "_and_end_%d:\n", id);
-}
-
-void emit_or(FILE *f, const char *dst, const char *a, const char *b) {
-    int id = asm_label_id++;
-    fprintf(f, "  ; %s = %s || %s\n", dst, a, b);
-    emit_load(f, a);
-    fprintf(f, "  BNE _or_true_%d\n", id);
-    emit_load(f, b);
-    fprintf(f, "  BNE _or_true_%d\n", id);
-    fprintf(f, "  LDA #0\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "  JMP _or_end_%d\n", id);
-    fprintf(f, "_or_true_%d:\n", id);
-    fprintf(f, "  LDA #1\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "_or_end_%d:\n", id);
-}
-
-void gerar_assembly_6502(const char *filename) {
-    FILE *f;
-    int i, n;
-    char line[TAC_LINE_LEN];
-    char dst[64], a[64], b[64], op[8];
-    int len;
-
-    f = fopen(filename, "w");
-    if (!f) {
-        fprintf(stderr, "Erro ao criar arquivo de assembly: %s\n", filename);
-        return;
-    }
-
-    fprintf(f, "; ================================================\n");
-    fprintf(f, "; Assembly MOS6502 gerado pela linguagem Alchemia\n");
-    fprintf(f, "; Simulador: https://skilldrick.github.io/easy6502/\n");
-    fprintf(f, "; Para verificar o resultado, consulte o endereco\n");
-    fprintf(f, "; zero-page da variavel desejada no mapa ao final.\n");
-    fprintf(f, "; ================================================\n");
-    fprintf(f, "*=$0600\n\n");
-
-    for (i = 0; i < tac_count; i++) {
-        strncpy(line, tac_buffer[i], TAC_LINE_LEN - 1);
-        line[TAC_LINE_LEN - 1] = '\0';
-        len = (int)strlen(line);
-
-        /* 1. Rotulo: termina com ':' */
-        if (len > 0 && line[len - 1] == ':') {
-            fprintf(f, "%s\n", line);
-            continue;
-        }
-
-        /* 2. goto L */
-        if (strncmp(line, "goto ", 5) == 0) {
-            fprintf(f, "  JMP %s\n", line + 5);
-            continue;
-        }
-
-        /* 3. ifFalse t goto L  — salta para L se t == 0 (falso) */
-        if (sscanf(line, "ifFalse %63s goto %63s", a, b) == 2) {
-            int id = asm_label_id++;
-            fprintf(f, "  LDA $%02X  ; %s\n", get_zp_addr(a), a);
-            fprintf(f, "  BNE _skpf_%d\n", id);
-            fprintf(f, "  JMP %s\n", b);
-            fprintf(f, "_skpf_%d:\n", id);
-            continue;
-        }
-
-        /* 4. if t goto L  — salta para L se t != 0 (verdadeiro) */
-        if (strncmp(line, "if ", 3) == 0 &&
-            sscanf(line, "if %63s goto %63s", a, b) == 2) {
-            int id = asm_label_id++;
-            fprintf(f, "  LDA $%02X  ; %s\n", get_zp_addr(a), a);
-            fprintf(f, "  BEQ _skpt_%d\n", id);
-            fprintf(f, "  JMP %s\n", b);
-            fprintf(f, "_skpt_%d:\n", id);
-            continue;
-        }
-
-        /* 5. dst = ! src */
-        if (sscanf(line, "%63s = ! %63s", dst, a) == 2) {
-            int id = asm_label_id++;
-            fprintf(f, "  ; %s = ! %s\n", dst, a);
-            fprintf(f, "  LDA $%02X  ; %s\n", get_zp_addr(a), a);
-            fprintf(f, "  BEQ _not_t_%d\n", id);
-            fprintf(f, "  LDA #0\n");
-            fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-            fprintf(f, "  JMP _not_e_%d\n", id);
-            fprintf(f, "_not_t_%d:\n", id);
-            fprintf(f, "  LDA #1\n");
-            fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-            fprintf(f, "_not_e_%d:\n", id);
-            continue;
-        }
-
-        /* 6. dst = a OP b */
-        n = sscanf(line, "%63s = %63s %7s %63s", dst, a, op, b);
-        if (n == 4) {
-            if (strcmp(op, "+") == 0) {
-                fprintf(f, "  ; %s = %s + %s\n", dst, a, b);
-                emit_load(f, a);
-                fprintf(f, "  CLC\n");
-                emit_adc_op(f, b);
-                fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-            } else if (strcmp(op, "-") == 0) {
-                fprintf(f, "  ; %s = %s - %s\n", dst, a, b);
-                emit_load(f, a);
-                fprintf(f, "  SEC\n");
-                emit_sbc_op(f, b);
-                fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-            } else if (strcmp(op, "*") == 0) {
-                emit_multiply(f, dst, a, b);
-            } else if (strcmp(op, "/") == 0) {
-                emit_divide(f, dst, a, b);
-            } else if (strcmp(op, "%") == 0) {
-                emit_modulo(f, dst, a, b);
-            } else if (strcmp(op, "&&") == 0) {
-                emit_and(f, dst, a, b);
-            } else if (strcmp(op, "||") == 0) {
-                emit_or(f, dst, a, b);
-            } else {
-                emit_comparison(f, dst, a, b, op);
-            }
-            continue;
-        }
-
-        /* 7. dst = src  (atribuicao simples: variavel ou literal) */
-        if (sscanf(line, "%63s = %63s", dst, a) == 2) {
-            fprintf(f, "  ; %s = %s\n", dst, a);
-            emit_load(f, a);
-            fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-            continue;
-        }
-
-        fprintf(f, "  ; [nao traduzido]: %s\n", line);
-    }
-
-    fprintf(f, "\n  BRK\n");
-
-    /* Mapa de enderecos zero-page */
-    fprintf(f, "\n; ===================================\n");
-    fprintf(f, "; MAPA DE MEMORIA (ZERO PAGE)\n");
-    fprintf(f, "; ===================================\n");
-    fprintf(f, "; Variaveis do programa:\n");
-    for (i = 0; i < addr6502_count; i++) {
-        const char *n2 = addr6502[i].name;
-        int is_temp = (n2[0] == 't' && n2[1] >= '0' && n2[1] <= '9');
-        int is_scratch = (strncmp(n2, "__", 2) == 0);
-        if (!is_temp && !is_scratch)
-            fprintf(f, ";   $%02X  =  %s\n", addr6502[i].addr, n2);
-    }
-    fprintf(f, "; Temporarios internos:\n");
-    for (i = 0; i < addr6502_count; i++) {
-        const char *n2 = addr6502[i].name;
-        int is_temp = (n2[0] == 't' && n2[1] >= '0' && n2[1] <= '9');
-        int is_scratch = (strncmp(n2, "__", 2) == 0);
-        if (is_temp || is_scratch)
-            fprintf(f, ";   $%02X  =  %s\n", addr6502[i].addr, n2);
-    }
-
-    fclose(f);
-}
-
 int inserir_tabela(const char *nome, const char *tipo) {
     int i;
 
@@ -940,25 +692,11 @@ int main(int argc, char **argv) {
     }
 
     imprimir_codigo_intermediario();
-
-    /* Gerar assembly MOS6502 */
-    {
-        char asm_filename[300] = "output.asm";
-        if (argc > 1) {
-            char *dot = strrchr(argv[1], '.');
-            if (dot) {
-                int base_len = (int)(dot - argv[1]);
-                if (base_len > 0 && base_len < 290) {
-                    strncpy(asm_filename, argv[1], base_len);
-                    asm_filename[base_len] = '\0';
-                    strcat(asm_filename, ".asm");
-                }
-            } else {
-                snprintf(asm_filename, sizeof(asm_filename), "%s.asm", argv[1]);
-            }
-        }
-        gerar_assembly_6502(asm_filename);
-        printf("\nAssembly MOS6502 gerado em: %s\n", asm_filename);
+    
+    if (numSemanticErros == 0) {
+        imprimir_codigo_objeto();
+    } else {
+        printf("\n=== CODIGO OBJETO: Bloqueado devido a erros semanticos. ===\n");
     }
 
     if (yyin != NULL) {
@@ -966,4 +704,16 @@ int main(int argc, char **argv) {
     }
 
     return 0;
+}
+
+void imprimir_codigo_objeto(void) {
+    int i;
+    printf("\n=== CÓDIGO OBJETO GERADO (MOS 6502 - ACUMULADOR) ===\n");
+    if (tac_count == 0) {
+        printf("(nenhuma instrucao executavel para traduzir)\n");
+    }
+    for (i = 0; i < tac_count; i++) {
+        traduzir_instrucao_objeto(tac_buffer[i]);
+    }
+    printf("===========================================================\n");
 }
