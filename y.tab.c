@@ -73,6 +73,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 extern int linha_atual;
 extern char *yytext;
@@ -80,6 +81,8 @@ extern FILE *yyin;
 
 int yylex(void);
 void yyerror(const char *s);
+void imprimir_codigo_objeto(void);
+void gerar_assembly_dasm(const char *filename);
 
 /* ===================== TABELA DE SIMBOLOS ===================== */
 
@@ -220,33 +223,128 @@ int tipos_compativeis(const char *destino, const char *origem) {
     return 0;
 }
 
-/* ===================== GERACAO DE ASSEMBLY MOS6502 ================= */
+/* ===================== SIMULADOR RESTRITO MOS 6502 ================= */
 
-typedef struct { char name[64]; unsigned char addr; } Addr6502;
-static Addr6502 addr6502[256];
-static int addr6502_count = 0;
-static unsigned char next_zp_addr = 0x00;
-static int asm_label_id = 0;
+// Função auxiliar para carregar um operando no Acumulador (A)
+void mos6502_carregar_acumulador(const char *operando) {
+    if (isdigit(operando[0]) || operando[0] == '-' || operando[0] == '+' || operando[0] == '\'') {
+        printf("    LDA #%s\n", operando); // Carrega valor imediato (literal)
+    } else {
+        printf("    LDA %s\n", operando);   // Carrega direto da memória (variável ou temporário)
+    }
+}
 
-unsigned char get_zp_addr(const char *name);
-int is_int_literal(const char *s);
-int is_float_literal(const char *s);
-int is_char_literal(const char *s);
-int literal_to_byte(const char *s);
-void emit_load(FILE *f, const char *operand);
-void emit_cmp_op(FILE *f, const char *operand);
-void emit_adc_op(FILE *f, const char *operand);
-void emit_sbc_op(FILE *f, const char *operand);
-void emit_comparison(FILE *f, const char *dst, const char *a, const char *b, const char *oper);
-void emit_multiply(FILE *f, const char *dst, const char *a, const char *b);
-void emit_divide(FILE *f, const char *dst, const char *a, const char *b);
-void emit_modulo(FILE *f, const char *dst, const char *a, const char *b);
-void emit_and(FILE *f, const char *dst, const char *a, const char *b);
-void emit_or(FILE *f, const char *dst, const char *a, const char *b);
-void gerar_assembly_6502(const char *filename);
+void traduzir_instrucao_objeto(char *linha) {
+    char l_limpa[TAC_LINE_LEN];
+    strcpy(l_limpa, linha);
+    
+    int tam = strlen(l_limpa);
+    if (tam > 0 && l_limpa[tam - 1] == ':') {
+        printf("%s\n", l_limpa);
+        return;
+    }
+
+    char arg1[64] = "", op[64] = "", arg2[64] = "", arg3[64] = "", arg4[64] = "";
+    int tokens = sscanf(l_limpa, "%s %s %s %s %s", arg1, op, arg2, arg3, arg4);
+
+    if (tokens <= 0) return;
+
+    // Comando de Desvio Incondicional (JUMP)
+    if (strcmp(arg1, "goto") == 0) {
+        printf("    JMP %s\n", op);
+        return;
+    }
+
+    // Comandos de Desvio Condicional baseados em Flags do 6502
+    if (strcmp(arg1, "ifFalse") == 0) {
+        // No 6502, testamos o valor carregando-o e verificando se é zero
+        printf("    LDA %s\n", op);
+        printf("    BEQ %s\n", arg4); // Branch if Equal (Desvia se for falso/zero)
+        return;
+    }
+    if (strcmp(arg1, "if") == 0) {
+        printf("    LDA %s\n", op);
+        printf("    BNE %s\n", arg4); // Branch if Not Equal (Desvia se for verdadeiro/não-zero)
+        return;
+    }
+
+    // Operações de Atribuição e Aritmética Baseadas em Acumulador (A)
+    if (strcmp(op, "=") == 0) {
+        // Atribuição Simples: var = operando
+        if (tokens == 3) {
+            mos6502_carregar_acumulador(arg2);
+            printf("    STA %s\n", arg1); // Salva o Acumulador na memória de destino
+        } 
+        // Operação Unária: var = !operando (NOT lógico)
+        else if (tokens == 4 && strcmp(arg2, "!") == 0) {
+            printf("    LDA %s\n", arg3);
+            printf("    EOR #$FF\n"); // Inverte os bits usando OU Exclusivo (XOR) no Acumulador
+            printf("    STA %s\n", arg1);
+        }
+        // Operações Binárias de Três Endereços convertidas para Acumulador
+        else if (tokens == 5) {
+            // Passo 1: O primeiro operando obrigatoriamente vai para o Acumulador
+            mos6502_carregar_acumulador(arg2);
+
+            // Passo 2: Executa a operação matemática correspondente do 6502
+            if (strcmp(arg3, "+") == 0) {
+                printf("    CLC\n"); // Limpa o Carry Flag (obrigatório antes de ADC)
+                if (isdigit(arg4[0])) printf("    ADC #%s\n", arg4);
+                else printf("    ADC %s\n", arg4);
+            }
+            else if (strcmp(arg3, "-") == 0) {
+                printf("    SEC\n"); // Seta o Carry Flag (obrigatório antes de SBC)
+                if (isdigit(arg4[0])) printf("    SBC #%s\n", arg4);
+                else printf("    SBC %s\n", arg4);
+            }
+            else if (strcmp(arg3, "*") == 0 || strcmp(arg3, "/") == 0 || strcmp(arg3, "%") == 0) {
+                // O MOS 6502 original não tem multiplicação/divisão via hardware!
+                // Simulamos chamando uma subrotina dedicada (Subroutine)
+                if (strcmp(arg3, "*") == 0) {
+                    printf("    LDX %s\n", arg4); // Usa o registrador X para passar o multiplicador
+                    printf("    JSR MULTIPLICAR_6502\n");
+                } else {
+                    printf("    LDX %s\n", arg4);
+                    printf("    JSR DIVIDIR_6502\n");
+                }
+            }
+            // Comparações lógicas (Geram flags de desvio)
+            else if (strcmp(arg3, "==") == 0 || strcmp(arg3, "!=") == 0 || 
+                     strcmp(arg3, ">") == 0  || strcmp(arg3, "<") == 0 || 
+                     strcmp(arg3, ">=") == 0 || strcmp(arg3, "<=") == 0) {
+                
+                if (isdigit(arg4[0])) printf("    CMP #%s\n", arg4);
+                else printf("    CMP %s\n", arg4);
+                
+                // Transforma o resultado da comparação em um valor booleano (0 ou 1) no Acumulador
+                char label_fim[16];
+                sprintf(label_fim, ".Cmp%d", rand() % 1000);
+                
+                if (strcmp(arg3, "==") == 0) {
+                    printf("    BEQ .SetTrue%s\n", label_fim);
+                } else if (strcmp(arg3, "!=") == 0) {
+                    printf("    BNE .SetTrue%s\n", label_fim);
+                } else if (strcmp(arg3, ">") == 0) {
+                    printf("    BPL .SetTrue%s\n", label_fim); // Verifica flag positivo
+                } else if (strcmp(arg3, "<") == 0) {
+                    printf("    BMI .SetTrue%s\n", label_fim); // Verifica flag negativo
+                }
+                
+                printf("    LDA #0\n"); // Falso
+                printf("    JMP .Fim%s\n", label_fim);
+                printf(".SetTrue%s:\n", label_fim);
+                printf("    LDA #1\n"); // Verdadeiro
+                printf(".Fim%s:\n", label_fim);
+            }
+
+            // Passo 3: Salva o resultado final que restou no Acumulador na memória estável
+            printf("    STA %s\n", arg1);
+        }
+    }
+}
 
 
-#line 250 "y.tab.c"
+#line 348 "y.tab.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -369,7 +467,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 180 "translate.y"
+#line 278 "translate.y"
 
     char *strval;
     struct expr_s {
@@ -377,7 +475,7 @@ union YYSTYPE
         char tipo[20];
     } expr;
 
-#line 381 "y.tab.c"
+#line 479 "y.tab.c"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -468,7 +566,7 @@ typedef enum yysymbol_kind_t yysymbol_kind_t;
 
 
 /* Second part of user prologue.  */
-#line 188 "translate.y"
+#line 286 "translate.y"
 
 typedef struct expr_s Expr;
 
@@ -538,7 +636,7 @@ void gerar_negacao(Expr *res, Expr e) {
     strcpy(res->tipo, "elixir");
 }
 
-#line 542 "y.tab.c"
+#line 640 "y.tab.c"
 
 
 #ifdef short
@@ -924,12 +1022,12 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   279,   279,   283,   284,   288,   289,   290,   291,   295,
-     299,   311,   312,   313,   314,   318,   333,   340,   348,   332,
-     357,   364,   356,   370,   371,   375,   376,   377,   382,   388,
-     395,   381,   406,   412,   420,   425,   405,   437,   436,   451,
-     460,   461,   462,   463,   464,   465,   466,   467,   468,   469,
-     470,   471,   472,   473,   474,   475,   476,   477,   478,   479
+       0,   377,   377,   381,   382,   386,   387,   388,   389,   393,
+     397,   409,   410,   411,   412,   416,   431,   438,   446,   430,
+     455,   462,   454,   468,   469,   473,   474,   475,   480,   486,
+     493,   479,   504,   510,   518,   523,   503,   535,   534,   549,
+     558,   559,   560,   561,   562,   563,   564,   565,   566,   567,
+     568,   569,   570,   571,   572,   573,   574,   575,   576,   577
 };
 #endif
 
@@ -1593,16 +1691,16 @@ yyreduce:
   switch (yyn)
     {
   case 9: /* declaracao_variavel: tipo ID  */
-#line 295 "translate.y"
+#line 393 "translate.y"
               {
           if (inserir_tabela((yyvsp[0].strval), (yyvsp[-1].strval)))
               semantic_error(linha_atual, "variavel \"%s\" ja foi declarada", (yyvsp[0].strval));
       }
-#line 1602 "y.tab.c"
+#line 1700 "y.tab.c"
     break;
 
   case 10: /* declaracao_variavel: tipo ID ATRIBUICAO expressao  */
-#line 299 "translate.y"
+#line 397 "translate.y"
                                    {
           if (inserir_tabela((yyvsp[-2].strval), (yyvsp[-3].strval)))
               semantic_error(linha_atual, "variavel \"%s\" ja foi declarada", (yyvsp[-2].strval));
@@ -1612,35 +1710,35 @@ yyreduce:
                   (yyvsp[-2].strval), (yyvsp[-3].strval), (yyvsp[0].expr).tipo);
           add_tac("%s = %s", (yyvsp[-2].strval), (yyvsp[0].expr).name);
       }
-#line 1616 "y.tab.c"
+#line 1714 "y.tab.c"
     break;
 
   case 11: /* tipo: TIPO_CHUMBO  */
-#line 311 "translate.y"
+#line 409 "translate.y"
                        { (yyval.strval) = "chumbo"; }
-#line 1622 "y.tab.c"
+#line 1720 "y.tab.c"
     break;
 
   case 12: /* tipo: TIPO_MERCURIO  */
-#line 312 "translate.y"
+#line 410 "translate.y"
                        { (yyval.strval) = "mercurio"; }
-#line 1628 "y.tab.c"
+#line 1726 "y.tab.c"
     break;
 
   case 13: /* tipo: TIPO_ELIXIR  */
-#line 313 "translate.y"
+#line 411 "translate.y"
                        { (yyval.strval) = "elixir"; }
-#line 1634 "y.tab.c"
+#line 1732 "y.tab.c"
     break;
 
   case 14: /* tipo: TIPO_RUNA  */
-#line 314 "translate.y"
+#line 412 "translate.y"
                        { (yyval.strval) = "runa"; }
-#line 1640 "y.tab.c"
+#line 1738 "y.tab.c"
     break;
 
   case 15: /* atribuicao: ID ATRIBUICAO expressao  */
-#line 318 "translate.y"
+#line 416 "translate.y"
                               {
           char *tipoVar = getDataType((yyvsp[-2].strval));
           if (!tipoVar) {
@@ -1652,22 +1750,22 @@ yyreduce:
           }
           add_tac("%s = %s", (yyvsp[-2].strval), (yyvsp[0].expr).name);
       }
-#line 1656 "y.tab.c"
+#line 1754 "y.tab.c"
     break;
 
   case 16: /* $@1: %empty  */
-#line 333 "translate.y"
+#line 431 "translate.y"
       {
           verificar_booleano((yyvsp[-1].expr));
           char *lelse = novo_label();
           add_tac("ifFalse %s goto %s", (yyvsp[-1].expr).name, lelse);
           push_label(lelse);
       }
-#line 1667 "y.tab.c"
+#line 1765 "y.tab.c"
     break;
 
   case 17: /* $@2: %empty  */
-#line 340 "translate.y"
+#line 438 "translate.y"
       {
           char *lelse = pop_label();
           char *lend = novo_label();
@@ -1675,83 +1773,83 @@ yyreduce:
           add_tac("%s:", lelse);
           push_label(lend);
       }
-#line 1679 "y.tab.c"
+#line 1777 "y.tab.c"
     break;
 
   case 18: /* $@3: %empty  */
-#line 348 "translate.y"
+#line 446 "translate.y"
       {
           char *lend = pop_label();
           add_tac("%s:", lend);
       }
-#line 1688 "y.tab.c"
+#line 1786 "y.tab.c"
     break;
 
   case 20: /* $@4: %empty  */
-#line 357 "translate.y"
+#line 455 "translate.y"
       {
           verificar_booleano((yyvsp[-1].expr));
           char *lelse = novo_label();
           add_tac("ifFalse %s goto %s", (yyvsp[-1].expr).name, lelse);
           push_label(lelse);
       }
-#line 1699 "y.tab.c"
+#line 1797 "y.tab.c"
     break;
 
   case 21: /* $@5: %empty  */
-#line 364 "translate.y"
+#line 462 "translate.y"
       {
           char *lelse = pop_label();
           add_tac("goto %s", peek_label());
           add_tac("%s:", lelse);
       }
-#line 1709 "y.tab.c"
+#line 1807 "y.tab.c"
     break;
 
   case 28: /* $@6: %empty  */
-#line 382 "translate.y"
+#line 480 "translate.y"
       {
           char *lstart = novo_label();
           add_tac("%s:", lstart);
           push_label(lstart);
       }
-#line 1719 "y.tab.c"
+#line 1817 "y.tab.c"
     break;
 
   case 29: /* $@7: %empty  */
-#line 388 "translate.y"
+#line 486 "translate.y"
       {
           verificar_booleano((yyvsp[-1].expr));
           char *lend = novo_label();
           add_tac("ifFalse %s goto %s", (yyvsp[-1].expr).name, lend);
           push_label(lend);
       }
-#line 1730 "y.tab.c"
+#line 1828 "y.tab.c"
     break;
 
   case 30: /* $@8: %empty  */
-#line 395 "translate.y"
+#line 493 "translate.y"
       {
           char *lend = pop_label();
           char *lstart = pop_label();
           add_tac("goto %s", lstart);
           add_tac("%s:", lend);
       }
-#line 1741 "y.tab.c"
+#line 1839 "y.tab.c"
     break;
 
   case 32: /* $@9: %empty  */
-#line 406 "translate.y"
+#line 504 "translate.y"
       {
           char *lstart = novo_label();
           add_tac("%s:", lstart);
           push_label(lstart);
       }
-#line 1751 "y.tab.c"
+#line 1849 "y.tab.c"
     break;
 
   case 33: /* $@10: %empty  */
-#line 412 "translate.y"
+#line 510 "translate.y"
       {
           verificar_booleano((yyvsp[-1].expr));
           char *lend = novo_label();
@@ -1759,20 +1857,20 @@ yyreduce:
           push_label(lend);
           push_marca(tac_count);
       }
-#line 1763 "y.tab.c"
+#line 1861 "y.tab.c"
     break;
 
   case 34: /* $@11: %empty  */
-#line 420 "translate.y"
+#line 518 "translate.y"
       {
           int marca = pop_marca();
           mover_para_buffer_temporario(marca);
       }
-#line 1772 "y.tab.c"
+#line 1870 "y.tab.c"
     break;
 
   case 35: /* $@12: %empty  */
-#line 425 "translate.y"
+#line 523 "translate.y"
       {
           restaurar_buffer_temporario();
           char *lend = pop_label();
@@ -1780,31 +1878,31 @@ yyreduce:
           add_tac("goto %s", lstart);
           add_tac("%s:", lend);
       }
-#line 1784 "y.tab.c"
+#line 1882 "y.tab.c"
     break;
 
   case 37: /* $@13: %empty  */
-#line 437 "translate.y"
+#line 535 "translate.y"
       {
           char *lstart = novo_label();
           add_tac("%s:", lstart);
           push_label(lstart);
       }
-#line 1794 "y.tab.c"
+#line 1892 "y.tab.c"
     break;
 
   case 38: /* comando_catalisar: CATALISAR $@13 FACA lista_declaracoes FIM CATALISAR '(' expressao ')'  */
-#line 443 "translate.y"
+#line 541 "translate.y"
       {
           verificar_booleano((yyvsp[-1].expr));
           char *lstart = pop_label();
           add_tac("if %s goto %s", (yyvsp[-1].expr).name, lstart);
       }
-#line 1804 "y.tab.c"
+#line 1902 "y.tab.c"
     break;
 
   case 39: /* expressao: ID  */
-#line 451 "translate.y"
+#line 549 "translate.y"
          {
           char *t = getDataType((yyvsp[0].strval));
           if (!t) {
@@ -1814,131 +1912,131 @@ yyreduce:
           strcpy((yyval.expr).name, (yyvsp[0].strval));
           strcpy((yyval.expr).tipo, t);
       }
-#line 1818 "y.tab.c"
+#line 1916 "y.tab.c"
     break;
 
   case 40: /* expressao: NUM_INT  */
-#line 460 "translate.y"
+#line 558 "translate.y"
                    { strcpy((yyval.expr).name, (yyvsp[0].strval)); strcpy((yyval.expr).tipo, "chumbo"); }
-#line 1824 "y.tab.c"
+#line 1922 "y.tab.c"
     break;
 
   case 41: /* expressao: NUM_REAL  */
-#line 461 "translate.y"
+#line 559 "translate.y"
                    { strcpy((yyval.expr).name, (yyvsp[0].strval)); strcpy((yyval.expr).tipo, "mercurio"); }
-#line 1830 "y.tab.c"
+#line 1928 "y.tab.c"
     break;
 
   case 42: /* expressao: LIT_CHAR  */
-#line 462 "translate.y"
+#line 560 "translate.y"
                    { strcpy((yyval.expr).name, (yyvsp[0].strval)); strcpy((yyval.expr).tipo, "runa"); }
-#line 1836 "y.tab.c"
+#line 1934 "y.tab.c"
     break;
 
   case 43: /* expressao: VAL_VERDADE  */
-#line 463 "translate.y"
+#line 561 "translate.y"
                    { strcpy((yyval.expr).name, "1"); strcpy((yyval.expr).tipo, "elixir"); }
-#line 1842 "y.tab.c"
+#line 1940 "y.tab.c"
     break;
 
   case 44: /* expressao: VAL_FALSO  */
-#line 464 "translate.y"
+#line 562 "translate.y"
                    { strcpy((yyval.expr).name, "0"); strcpy((yyval.expr).tipo, "elixir"); }
-#line 1848 "y.tab.c"
+#line 1946 "y.tab.c"
     break;
 
   case 45: /* expressao: '(' expressao ')'  */
-#line 465 "translate.y"
+#line 563 "translate.y"
                              { (yyval.expr) = (yyvsp[-1].expr); }
-#line 1854 "y.tab.c"
+#line 1952 "y.tab.c"
     break;
 
   case 46: /* expressao: OP_NOT expressao  */
-#line 466 "translate.y"
+#line 564 "translate.y"
                              { gerar_negacao(&(yyval.expr), (yyvsp[0].expr)); }
-#line 1860 "y.tab.c"
+#line 1958 "y.tab.c"
     break;
 
   case 47: /* expressao: expressao OP_OR expressao  */
-#line 467 "translate.y"
+#line 565 "translate.y"
                                   { gerar_logico(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "||"); }
-#line 1866 "y.tab.c"
+#line 1964 "y.tab.c"
     break;
 
   case 48: /* expressao: expressao OP_AND expressao  */
-#line 468 "translate.y"
+#line 566 "translate.y"
                                   { gerar_logico(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "&&"); }
-#line 1872 "y.tab.c"
+#line 1970 "y.tab.c"
     break;
 
   case 49: /* expressao: expressao OP_GT expressao  */
-#line 469 "translate.y"
+#line 567 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), ">", 1); }
-#line 1878 "y.tab.c"
+#line 1976 "y.tab.c"
     break;
 
   case 50: /* expressao: expressao OP_LT expressao  */
-#line 470 "translate.y"
+#line 568 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "<", 1); }
-#line 1884 "y.tab.c"
+#line 1982 "y.tab.c"
     break;
 
   case 51: /* expressao: expressao OP_GE expressao  */
-#line 471 "translate.y"
+#line 569 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), ">=", 1); }
-#line 1890 "y.tab.c"
+#line 1988 "y.tab.c"
     break;
 
   case 52: /* expressao: expressao OP_LE expressao  */
-#line 472 "translate.y"
+#line 570 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "<=", 1); }
-#line 1896 "y.tab.c"
+#line 1994 "y.tab.c"
     break;
 
   case 53: /* expressao: expressao OP_EQ expressao  */
-#line 473 "translate.y"
+#line 571 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "==", 0); }
-#line 1902 "y.tab.c"
+#line 2000 "y.tab.c"
     break;
 
   case 54: /* expressao: expressao OP_NE expressao  */
-#line 474 "translate.y"
+#line 572 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "!=", 0); }
-#line 1908 "y.tab.c"
+#line 2006 "y.tab.c"
     break;
 
   case 55: /* expressao: expressao OP_SOMA expressao  */
-#line 475 "translate.y"
+#line 573 "translate.y"
                                   { gerar_aritmetica(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "+", 0); }
-#line 1914 "y.tab.c"
+#line 2012 "y.tab.c"
     break;
 
   case 56: /* expressao: expressao OP_SUB expressao  */
-#line 476 "translate.y"
+#line 574 "translate.y"
                                   { gerar_aritmetica(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "-", 0); }
-#line 1920 "y.tab.c"
+#line 2018 "y.tab.c"
     break;
 
   case 57: /* expressao: expressao OP_MULT expressao  */
-#line 477 "translate.y"
+#line 575 "translate.y"
                                   { gerar_aritmetica(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "*", 0); }
-#line 1926 "y.tab.c"
+#line 2024 "y.tab.c"
     break;
 
   case 58: /* expressao: expressao OP_DIV expressao  */
-#line 478 "translate.y"
+#line 576 "translate.y"
                                   { gerar_aritmetica(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "/", 0); }
-#line 1932 "y.tab.c"
+#line 2030 "y.tab.c"
     break;
 
   case 59: /* expressao: expressao OP_MOD expressao  */
-#line 479 "translate.y"
+#line 577 "translate.y"
                                   { gerar_aritmetica(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "%", 1); }
-#line 1938 "y.tab.c"
+#line 2036 "y.tab.c"
     break;
 
 
-#line 1942 "y.tab.c"
+#line 2040 "y.tab.c"
 
       default: break;
     }
@@ -2131,353 +2229,8 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 482 "translate.y"
+#line 580 "translate.y"
 
-
-/* ================================================================== */
-/*               IMPLEMENTACAO — GERACAO DE ASSEMBLY MOS6502          */
-/* ================================================================== */
-
-unsigned char get_zp_addr(const char *name) {
-    int i;
-    for (i = 0; i < addr6502_count; i++)
-        if (strcmp(addr6502[i].name, name) == 0)
-            return addr6502[i].addr;
-    strncpy(addr6502[addr6502_count].name, name, 63);
-    addr6502[addr6502_count].name[63] = '\0';
-    addr6502[addr6502_count].addr = next_zp_addr;
-    addr6502_count++;
-    return next_zp_addr++;
-}
-
-int is_int_literal(const char *s) {
-    const char *p = s;
-    if (!p || !*p) return 0;
-    if (*p == '+' || *p == '-') p++;
-    if (!*p) return 0;
-    for (; *p; p++) if (*p < '0' || *p > '9') return 0;
-    return 1;
-}
-
-int is_float_literal(const char *s) {
-    const char *p = s;
-    int has_dot = 0;
-    if (!p || !*p) return 0;
-    if (*p == '+' || *p == '-') p++;
-    for (; *p; p++) {
-        if (*p == '.') { has_dot = 1; continue; }
-        if (*p < '0' || *p > '9') return 0;
-    }
-    return has_dot;
-}
-
-int is_char_literal(const char *s) {
-    return s && s[0] == '\'';
-}
-
-int literal_to_byte(const char *s) {
-    if (is_char_literal(s)) return (unsigned char)s[1];
-    return (int)atof(s) & 0xFF;
-}
-
-void emit_load(FILE *f, const char *operand) {
-    if (is_int_literal(operand) || is_char_literal(operand)) {
-        fprintf(f, "  LDA #%d\n", literal_to_byte(operand));
-    } else if (is_float_literal(operand)) {
-        fprintf(f, "  LDA #%d  ; %.10s (float truncado para inteiro)\n",
-                literal_to_byte(operand), operand);
-    } else {
-        fprintf(f, "  LDA $%02X  ; %s\n", get_zp_addr(operand), operand);
-    }
-}
-
-void emit_cmp_op(FILE *f, const char *operand) {
-    if (is_int_literal(operand) || is_float_literal(operand) || is_char_literal(operand))
-        fprintf(f, "  CMP #%d\n", literal_to_byte(operand));
-    else
-        fprintf(f, "  CMP $%02X  ; %s\n", get_zp_addr(operand), operand);
-}
-
-void emit_adc_op(FILE *f, const char *operand) {
-    if (is_int_literal(operand) || is_float_literal(operand) || is_char_literal(operand))
-        fprintf(f, "  ADC #%d\n", literal_to_byte(operand));
-    else
-        fprintf(f, "  ADC $%02X  ; %s\n", get_zp_addr(operand), operand);
-}
-
-void emit_sbc_op(FILE *f, const char *operand) {
-    if (is_int_literal(operand) || is_float_literal(operand) || is_char_literal(operand))
-        fprintf(f, "  SBC #%d\n", literal_to_byte(operand));
-    else
-        fprintf(f, "  SBC $%02X  ; %s\n", get_zp_addr(operand), operand);
-}
-
-void emit_comparison(FILE *f, const char *dst, const char *a, const char *b, const char *oper) {
-    int id = asm_label_id++;
-    fprintf(f, "  ; %s = %s %s %s\n", dst, a, oper, b);
-    emit_load(f, a);
-    emit_cmp_op(f, b);
-    if (strcmp(oper, "==") == 0) {
-        fprintf(f, "  BEQ _cmp_true_%d\n", id);
-    } else if (strcmp(oper, "!=") == 0) {
-        fprintf(f, "  BNE _cmp_true_%d\n", id);
-    } else if (strcmp(oper, "<") == 0) {
-        fprintf(f, "  BCC _cmp_true_%d\n", id);
-    } else if (strcmp(oper, ">=") == 0) {
-        fprintf(f, "  BCS _cmp_true_%d\n", id);
-    } else if (strcmp(oper, ">") == 0) {
-        /* a > b: igual => falso, carry set e nao igual => verdadeiro */
-        fprintf(f, "  BEQ _cmp_false_%d\n", id);
-        fprintf(f, "  BCS _cmp_true_%d\n", id);
-    } else if (strcmp(oper, "<=") == 0) {
-        /* a <= b: menor ou igual => verdadeiro */
-        fprintf(f, "  BCC _cmp_true_%d\n", id);
-        fprintf(f, "  BEQ _cmp_true_%d\n", id);
-    }
-    fprintf(f, "_cmp_false_%d:\n", id);
-    fprintf(f, "  LDA #0\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "  JMP _cmp_end_%d\n", id);
-    fprintf(f, "_cmp_true_%d:\n", id);
-    fprintf(f, "  LDA #1\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "_cmp_end_%d:\n", id);
-}
-
-void emit_multiply(FILE *f, const char *dst, const char *a, const char *b) {
-    int id = asm_label_id++;
-    fprintf(f, "  ; %s = %s * %s (adicao repetida — funciona para valores 0-255)\n", dst, a, b);
-    fprintf(f, "  LDA #0\n");
-    fprintf(f, "  STA $%02X  ; %s = 0\n", get_zp_addr(dst), dst);
-    if (is_int_literal(b) || is_float_literal(b) || is_char_literal(b))
-        fprintf(f, "  LDX #%d\n", literal_to_byte(b));
-    else
-        fprintf(f, "  LDX $%02X  ; %s\n", get_zp_addr(b), b);
-    fprintf(f, "_mult_loop_%d:\n", id);
-    fprintf(f, "  CPX #0\n");
-    fprintf(f, "  BEQ _mult_end_%d\n", id);
-    fprintf(f, "  CLC\n");
-    fprintf(f, "  LDA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    emit_adc_op(f, a);
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "  DEX\n");
-    fprintf(f, "  JMP _mult_loop_%d\n", id);
-    fprintf(f, "_mult_end_%d:\n", id);
-}
-
-void emit_divide(FILE *f, const char *dst, const char *a, const char *b) {
-    int id = asm_label_id++;
-    unsigned char num_addr = get_zp_addr("__div_num");
-    fprintf(f, "  ; %s = %s / %s (subtracao repetida — sem divisao por zero)\n", dst, a, b);
-    emit_load(f, a);
-    fprintf(f, "  STA $%02X  ; __div_num\n", num_addr);
-    fprintf(f, "  LDA #0\n");
-    fprintf(f, "  STA $%02X  ; %s = 0\n", get_zp_addr(dst), dst);
-    fprintf(f, "_div_loop_%d:\n", id);
-    fprintf(f, "  LDA $%02X  ; __div_num\n", num_addr);
-    emit_cmp_op(f, b);
-    fprintf(f, "  BCC _div_end_%d\n", id);
-    fprintf(f, "  SEC\n");
-    emit_sbc_op(f, b);
-    fprintf(f, "  STA $%02X  ; __div_num\n", num_addr);
-    fprintf(f, "  INC $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "  JMP _div_loop_%d\n", id);
-    fprintf(f, "_div_end_%d:\n", id);
-}
-
-void emit_modulo(FILE *f, const char *dst, const char *a, const char *b) {
-    int id = asm_label_id++;
-    unsigned char num_addr = get_zp_addr("__mod_num");
-    fprintf(f, "  ; %s = %s %% %s (subtracao repetida)\n", dst, a, b);
-    emit_load(f, a);
-    fprintf(f, "  STA $%02X  ; __mod_num\n", num_addr);
-    fprintf(f, "_mod_loop_%d:\n", id);
-    fprintf(f, "  LDA $%02X  ; __mod_num\n", num_addr);
-    emit_cmp_op(f, b);
-    fprintf(f, "  BCC _mod_end_%d\n", id);
-    fprintf(f, "  SEC\n");
-    emit_sbc_op(f, b);
-    fprintf(f, "  STA $%02X  ; __mod_num\n", num_addr);
-    fprintf(f, "  JMP _mod_loop_%d\n", id);
-    fprintf(f, "_mod_end_%d:\n", id);
-    fprintf(f, "  LDA $%02X  ; __mod_num\n", num_addr);
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-}
-
-void emit_and(FILE *f, const char *dst, const char *a, const char *b) {
-    int id = asm_label_id++;
-    fprintf(f, "  ; %s = %s && %s\n", dst, a, b);
-    emit_load(f, a);
-    fprintf(f, "  BEQ _and_false_%d\n", id);
-    emit_load(f, b);
-    fprintf(f, "  BEQ _and_false_%d\n", id);
-    fprintf(f, "  LDA #1\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "  JMP _and_end_%d\n", id);
-    fprintf(f, "_and_false_%d:\n", id);
-    fprintf(f, "  LDA #0\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "_and_end_%d:\n", id);
-}
-
-void emit_or(FILE *f, const char *dst, const char *a, const char *b) {
-    int id = asm_label_id++;
-    fprintf(f, "  ; %s = %s || %s\n", dst, a, b);
-    emit_load(f, a);
-    fprintf(f, "  BNE _or_true_%d\n", id);
-    emit_load(f, b);
-    fprintf(f, "  BNE _or_true_%d\n", id);
-    fprintf(f, "  LDA #0\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "  JMP _or_end_%d\n", id);
-    fprintf(f, "_or_true_%d:\n", id);
-    fprintf(f, "  LDA #1\n");
-    fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-    fprintf(f, "_or_end_%d:\n", id);
-}
-
-void gerar_assembly_6502(const char *filename) {
-    FILE *f;
-    int i, n;
-    char line[TAC_LINE_LEN];
-    char dst[64], a[64], b[64], op[8];
-    int len;
-
-    f = fopen(filename, "w");
-    if (!f) {
-        fprintf(stderr, "Erro ao criar arquivo de assembly: %s\n", filename);
-        return;
-    }
-
-    fprintf(f, "; ================================================\n");
-    fprintf(f, "; Assembly MOS6502 gerado pela linguagem Alchemia\n");
-    fprintf(f, "; Simulador: https://skilldrick.github.io/easy6502/\n");
-    fprintf(f, "; Para verificar o resultado, consulte o endereco\n");
-    fprintf(f, "; zero-page da variavel desejada no mapa ao final.\n");
-    fprintf(f, "; ================================================\n");
-    fprintf(f, "*=$0600\n\n");
-
-    for (i = 0; i < tac_count; i++) {
-        strncpy(line, tac_buffer[i], TAC_LINE_LEN - 1);
-        line[TAC_LINE_LEN - 1] = '\0';
-        len = (int)strlen(line);
-
-        /* 1. Rotulo: termina com ':' */
-        if (len > 0 && line[len - 1] == ':') {
-            fprintf(f, "%s\n", line);
-            continue;
-        }
-
-        /* 2. goto L */
-        if (strncmp(line, "goto ", 5) == 0) {
-            fprintf(f, "  JMP %s\n", line + 5);
-            continue;
-        }
-
-        /* 3. ifFalse t goto L  — salta para L se t == 0 (falso) */
-        if (sscanf(line, "ifFalse %63s goto %63s", a, b) == 2) {
-            int id = asm_label_id++;
-            fprintf(f, "  LDA $%02X  ; %s\n", get_zp_addr(a), a);
-            fprintf(f, "  BNE _skpf_%d\n", id);
-            fprintf(f, "  JMP %s\n", b);
-            fprintf(f, "_skpf_%d:\n", id);
-            continue;
-        }
-
-        /* 4. if t goto L  — salta para L se t != 0 (verdadeiro) */
-        if (strncmp(line, "if ", 3) == 0 &&
-            sscanf(line, "if %63s goto %63s", a, b) == 2) {
-            int id = asm_label_id++;
-            fprintf(f, "  LDA $%02X  ; %s\n", get_zp_addr(a), a);
-            fprintf(f, "  BEQ _skpt_%d\n", id);
-            fprintf(f, "  JMP %s\n", b);
-            fprintf(f, "_skpt_%d:\n", id);
-            continue;
-        }
-
-        /* 5. dst = ! src */
-        if (sscanf(line, "%63s = ! %63s", dst, a) == 2) {
-            int id = asm_label_id++;
-            fprintf(f, "  ; %s = ! %s\n", dst, a);
-            fprintf(f, "  LDA $%02X  ; %s\n", get_zp_addr(a), a);
-            fprintf(f, "  BEQ _not_t_%d\n", id);
-            fprintf(f, "  LDA #0\n");
-            fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-            fprintf(f, "  JMP _not_e_%d\n", id);
-            fprintf(f, "_not_t_%d:\n", id);
-            fprintf(f, "  LDA #1\n");
-            fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-            fprintf(f, "_not_e_%d:\n", id);
-            continue;
-        }
-
-        /* 6. dst = a OP b */
-        n = sscanf(line, "%63s = %63s %7s %63s", dst, a, op, b);
-        if (n == 4) {
-            if (strcmp(op, "+") == 0) {
-                fprintf(f, "  ; %s = %s + %s\n", dst, a, b);
-                emit_load(f, a);
-                fprintf(f, "  CLC\n");
-                emit_adc_op(f, b);
-                fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-            } else if (strcmp(op, "-") == 0) {
-                fprintf(f, "  ; %s = %s - %s\n", dst, a, b);
-                emit_load(f, a);
-                fprintf(f, "  SEC\n");
-                emit_sbc_op(f, b);
-                fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-            } else if (strcmp(op, "*") == 0) {
-                emit_multiply(f, dst, a, b);
-            } else if (strcmp(op, "/") == 0) {
-                emit_divide(f, dst, a, b);
-            } else if (strcmp(op, "%") == 0) {
-                emit_modulo(f, dst, a, b);
-            } else if (strcmp(op, "&&") == 0) {
-                emit_and(f, dst, a, b);
-            } else if (strcmp(op, "||") == 0) {
-                emit_or(f, dst, a, b);
-            } else {
-                emit_comparison(f, dst, a, b, op);
-            }
-            continue;
-        }
-
-        /* 7. dst = src  (atribuicao simples: variavel ou literal) */
-        if (sscanf(line, "%63s = %63s", dst, a) == 2) {
-            fprintf(f, "  ; %s = %s\n", dst, a);
-            emit_load(f, a);
-            fprintf(f, "  STA $%02X  ; %s\n", get_zp_addr(dst), dst);
-            continue;
-        }
-
-        fprintf(f, "  ; [nao traduzido]: %s\n", line);
-    }
-
-    fprintf(f, "\n  BRK\n");
-
-    /* Mapa de enderecos zero-page */
-    fprintf(f, "\n; ===================================\n");
-    fprintf(f, "; MAPA DE MEMORIA (ZERO PAGE)\n");
-    fprintf(f, "; ===================================\n");
-    fprintf(f, "; Variaveis do programa:\n");
-    for (i = 0; i < addr6502_count; i++) {
-        const char *n2 = addr6502[i].name;
-        int is_temp = (n2[0] == 't' && n2[1] >= '0' && n2[1] <= '9');
-        int is_scratch = (strncmp(n2, "__", 2) == 0);
-        if (!is_temp && !is_scratch)
-            fprintf(f, ";   $%02X  =  %s\n", addr6502[i].addr, n2);
-    }
-    fprintf(f, "; Temporarios internos:\n");
-    for (i = 0; i < addr6502_count; i++) {
-        const char *n2 = addr6502[i].name;
-        int is_temp = (n2[0] == 't' && n2[1] >= '0' && n2[1] <= '9');
-        int is_scratch = (strncmp(n2, "__", 2) == 0);
-        if (is_temp || is_scratch)
-            fprintf(f, ";   $%02X  =  %s\n", addr6502[i].addr, n2);
-    }
-
-    fclose(f);
-}
 
 int inserir_tabela(const char *nome, const char *tipo) {
     int i;
@@ -2593,25 +2346,32 @@ int main(int argc, char **argv) {
     }
 
     imprimir_codigo_intermediario();
+    
+    if (numSemanticErros == 0) {
+        imprimir_codigo_objeto();
 
-    /* Gerar assembly MOS6502 */
-    {
-        char asm_filename[300] = "output.asm";
-        if (argc > 1) {
-            char *dot = strrchr(argv[1], '.');
-            if (dot) {
-                int base_len = (int)(dot - argv[1]);
-                if (base_len > 0 && base_len < 290) {
-                    strncpy(asm_filename, argv[1], base_len);
-                    asm_filename[base_len] = '\0';
-                    strcat(asm_filename, ".asm");
+        /* Gerar arquivo .asm no formato DASM para Atari 2600 / Stella */
+        {
+            char dasm_filename[300] = "output_stella.asm";
+            if (argc > 1) {
+                const char *base = strrchr(argv[1], '/');
+                base = base ? base + 1 : argv[1];
+                char *dot = strrchr(base, '.');
+                if (dot) {
+                    int base_len = (int)(dot - base);
+                    if (base_len > 0 && base_len < 285)
+                        snprintf(dasm_filename, sizeof(dasm_filename),
+                                 "%.*s_stella.asm", base_len, base);
+                } else {
+                    snprintf(dasm_filename, sizeof(dasm_filename),
+                             "%s_stella.asm", base);
                 }
-            } else {
-                snprintf(asm_filename, sizeof(asm_filename), "%s.asm", argv[1]);
             }
+            gerar_assembly_dasm(dasm_filename);
+            printf("\nAssembly DASM (Stella) gerado em: %s\n", dasm_filename);
         }
-        gerar_assembly_6502(asm_filename);
-        printf("\nAssembly MOS6502 gerado em: %s\n", asm_filename);
+    } else {
+        printf("\n=== CODIGO OBJETO: Bloqueado devido a erros semanticos. ===\n");
     }
 
     if (yyin != NULL) {
@@ -2619,4 +2379,165 @@ int main(int argc, char **argv) {
     }
 
     return 0;
+}
+
+void imprimir_codigo_objeto(void) {
+    int i;
+    printf("\n=== CÓDIGO OBJETO GERADO (MOS 6502) ===\n");
+    if (tac_count == 0) {
+        printf("(nenhuma instrucao executavel para traduzir)\n");
+    }
+    for (i = 0; i < tac_count; i++) {
+        traduzir_instrucao_objeto(tac_buffer[i]);
+    }
+    printf("===========================================================\n");
+}
+
+
+void gerar_assembly_dasm(const char *fname) {
+    FILE *f;
+    int i, n, id, len;
+    char ln[TAC_LINE_LEN], dst[64], a[64], b[64], op[8];
+    char lb[200][64]; int nl = 0;
+    char nm[200][64]; int nn = 0;
+
+#define LIT(s) ((s)[0]&&(isdigit((unsigned char)(s)[0])||(s)[0]=='-'||(s)[0]=='+'||(s)[0]=='\''))
+#define VAL(s) ((s)[0]=='\''?(unsigned char)(s)[1]:(int)atof(s)&0xFF)
+#define LD(o)  do{const char*_o=(o);if(LIT(_o))fprintf(f,"    LDA #%d\n",VAL(_o));else fprintf(f,"    LDA %s\n",_o);}while(0)
+#define CM(o)  do{const char*_o=(o);if(LIT(_o))fprintf(f,"    CMP #%d\n",VAL(_o));else fprintf(f,"    CMP %s\n",_o);}while(0)
+#define AD(o)  do{const char*_o=(o);if(LIT(_o))fprintf(f,"    ADC #%d\n",VAL(_o));else fprintf(f,"    ADC %s\n",_o);}while(0)
+#define SB(o)  do{const char*_o=(o);if(LIT(_o))fprintf(f,"    SBC #%d\n",VAL(_o));else fprintf(f,"    SBC %s\n",_o);}while(0)
+#define LX(o)  do{const char*_o=(o);if(LIT(_o))fprintf(f,"    LDX #%d\n",VAL(_o));else fprintf(f,"    LDX %s\n",_o);}while(0)
+#define REG(s) do{const char*_s=(s);int _j,_ok=1;\
+    if(!_s||!*_s||LIT(_s))_ok=0;\
+    if(_ok)for(_j=0;_j<nl;_j++)if(strcmp(lb[_j],_s)==0){_ok=0;break;}\
+    if(_ok)for(_j=0;_j<nn;_j++)if(strcmp(nm[_j],_s)==0){_ok=0;break;}\
+    if(_ok&&nn<200){strncpy(nm[nn],_s,63);nm[nn++][63]='\0';}\
+}while(0)
+
+    for (i = 0; i < tac_count; i++) {
+        len = strlen(tac_buffer[i]);
+        if (len > 0 && tac_buffer[i][len-1] == ':' && nl < 200) {
+            strncpy(lb[nl], tac_buffer[i], len-1);
+            lb[nl++][len-1] = '\0';
+        }
+    }
+
+    for (i = 0; i < tac_count; i++) {
+        strncpy(ln, tac_buffer[i], TAC_LINE_LEN-1); ln[TAC_LINE_LEN-1] = '\0';
+        len = strlen(ln);
+        if (len > 0 && ln[len-1] == ':') continue;
+        if (strncmp(ln, "goto ", 5) == 0) continue;
+        if (sscanf(ln, "%63s = ! %63s", dst, a) == 2) { REG(dst); REG(a); continue; }
+        n = sscanf(ln, "%63s = %63s %7s %63s", dst, a, op, b);
+        if (n == 4) {
+            REG(dst); REG(a); REG(b);
+            if (strcmp(op,"/")==0) REG("__dv");
+            if (strcmp(op,"%")==0) REG("__md");
+            continue;
+        }
+        if (sscanf(ln, "%63s = %63s", dst, a) == 2) { REG(dst); REG(a); continue; }
+        if (sscanf(ln, "ifFalse %63s goto %63s", a, b) == 2) { REG(a); continue; }
+        if (strncmp(ln,"if ",3)==0 && sscanf(ln,"if %63s goto %63s",a,b)==2) { REG(a); continue; }
+    }
+
+    f = fopen(fname, "w");
+    if (!f) { fprintf(stderr, "Erro: %s\n", fname); goto end; }
+
+    fprintf(f, "    PROCESSOR 6502\n    INCLUDE \"vcs.h\"\n    INCLUDE \"macro.h\"\n\n");
+    fprintf(f, "    SEG.U RAM\n    ORG $80\n");
+    for (i = 0; i < nn; i++) fprintf(f, "%-12s ds 1\n", nm[i]);
+    fprintf(f, "\n    SEG CODE\n    ORG $F000\n\nSTART:\n    CLEAN_START\n\n");
+
+    id = 0;
+    for (i = 0; i < tac_count; i++) {
+        strncpy(ln, tac_buffer[i], TAC_LINE_LEN-1); ln[TAC_LINE_LEN-1] = '\0';
+        len = strlen(ln);
+
+        if (len > 0 && ln[len-1] == ':') { fprintf(f, "%s\n", ln); continue; }
+
+        fprintf(f, "; %s\n", ln);
+
+        if (strncmp(ln, "goto ", 5) == 0) { fprintf(f, "    JMP %s\n", ln+5); continue; }
+
+        if (sscanf(ln, "ifFalse %63s goto %63s", a, b) == 2) {
+            int k = id++;
+            fprintf(f, "    LDA %s\n    BNE _s%d\n    JMP %s\n_s%d:\n", a, k, b, k);
+            continue;
+        }
+
+        if (strncmp(ln,"if ",3)==0 && sscanf(ln,"if %63s goto %63s",a,b)==2) {
+            int k = id++;
+            fprintf(f, "    LDA %s\n    BEQ _s%d\n    JMP %s\n_s%d:\n", a, k, b, k);
+            continue;
+        }
+
+        if (sscanf(ln, "%63s = ! %63s", dst, a) == 2) {
+            int k = id++;
+            fprintf(f, "    LDA %s\n    BEQ _t%d\n    LDA #0\n    STA %s\n    JMP _e%d\n_t%d:\n    LDA #1\n    STA %s\n_e%d:\n",
+                    a, k, dst, k, k, dst, k);
+            continue;
+        }
+
+        n = sscanf(ln, "%63s = %63s %7s %63s", dst, a, op, b);
+        if (n == 4) {
+            int k = id++;
+            if (strcmp(op,"+")==0) {
+                LD(a); fprintf(f,"    CLC\n"); AD(b); fprintf(f,"    STA %s\n",dst);
+            } else if (strcmp(op,"-")==0) {
+                LD(a); fprintf(f,"    SEC\n"); SB(b); fprintf(f,"    STA %s\n",dst);
+            } else if (strcmp(op,"*")==0) {
+                fprintf(f,"    LDA #0\n    STA %s\n",dst); LX(b);
+                fprintf(f,"_ml%d:\n    CPX #0\n    BEQ _me%d\n    CLC\n    LDA %s\n",k,k,dst);
+                AD(a); fprintf(f,"    STA %s\n    DEX\n    JMP _ml%d\n_me%d:\n",dst,k,k);
+            } else if (strcmp(op,"/")==0) {
+                fprintf(f,"    LDA #0\n    STA %s\n",dst); LD(a); fprintf(f,"    STA __dv\n");
+                fprintf(f,"_dl%d:\n    LDA __dv\n",k); CM(b);
+                fprintf(f,"    BCC _de%d\n    SEC\n",k); SB(b);
+                fprintf(f,"    STA __dv\n    INC %s\n    JMP _dl%d\n_de%d:\n",dst,k,k);
+            } else if (strcmp(op,"%")==0) {
+                LD(a); fprintf(f,"    STA __md\n");
+                fprintf(f,"_rl%d:\n    LDA __md\n",k); CM(b);
+                fprintf(f,"    BCC _re%d\n    SEC\n",k); SB(b);
+                fprintf(f,"    STA __md\n    JMP _rl%d\n_re%d:\n    LDA __md\n    STA %s\n",k,k,dst);
+            } else if (strcmp(op,"&&")==0) {
+                LD(a); fprintf(f,"    BEQ _f%d\n",k);
+                LD(b); fprintf(f,"    BEQ _f%d\n    LDA #1\n    STA %s\n    JMP _e%d\n_f%d:\n    LDA #0\n    STA %s\n_e%d:\n",k,dst,k,k,dst,k);
+            } else if (strcmp(op,"||")==0) {
+                LD(a); fprintf(f,"    BNE _t%d\n",k);
+                LD(b); fprintf(f,"    BNE _t%d\n    LDA #0\n    STA %s\n    JMP _e%d\n_t%d:\n    LDA #1\n    STA %s\n_e%d:\n",k,dst,k,k,dst,k);
+            } else {
+                LD(a); CM(b);
+                if      (strcmp(op,"==")==0) fprintf(f,"    BEQ _t%d\n",k);
+                else if (strcmp(op,"!=")==0) fprintf(f,"    BNE _t%d\n",k);
+                else if (strcmp(op,"<") ==0) fprintf(f,"    BCC _t%d\n",k);
+                else if (strcmp(op,">=")==0) fprintf(f,"    BCS _t%d\n",k);
+                else if (strcmp(op,">") ==0) { fprintf(f,"    BEQ _f%d\n    BCS _t%d\n",k,k); }
+                else if (strcmp(op,"<=")==0) { fprintf(f,"    BCC _t%d\n    BEQ _t%d\n",k,k); }
+                fprintf(f,"_f%d:\n    LDA #0\n    STA %s\n    JMP _e%d\n_t%d:\n    LDA #1\n    STA %s\n_e%d:\n",k,dst,k,k,dst,k);
+            }
+            continue;
+        }
+
+        if (sscanf(ln, "%63s = %63s", dst, a) == 2) {
+            LD(a); fprintf(f,"    STA %s\n",dst);
+            continue;
+        }
+    }
+
+    fprintf(f, "\nFIM_LOOP:\n    JMP FIM_LOOP\n\n    ORG $FFFC\n    .word START\n    .word START\n");
+    fprintf(f, "\n; Mapa de memoria\n");
+    for (i = 0; i < nn; i++) fprintf(f, "; $%02X = %s\n", 0x80+i, nm[i]);
+
+    fclose(f);
+end:
+#undef LIT
+#undef VAL
+#undef LD
+#undef CM
+#undef AD
+#undef SB
+#undef LX
+#undef REG
+    return;
 }
