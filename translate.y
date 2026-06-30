@@ -14,6 +14,11 @@ void yyerror(const char *s);
 void imprimir_codigo_objeto(void);
 void gerar_assembly_dasm(const char *filename);
 
+/* ===================== VARIAVEL FINAL OBRIGATORIA ============= */
+
+#define VARIAVEL_FINAL           "resultado"
+#define ENDERECO_VARIAVEL_FINAL  0x80
+
 /* ===================== TABELA DE SIMBOLOS ===================== */
 
 typedef struct {
@@ -680,6 +685,13 @@ int main(int argc, char **argv) {
     fflush(stdout);
     yyparse();
 
+    if (getDataType(VARIAVEL_FINAL) == NULL) {
+        semantic_error(linha_atual,
+            "a variavel final obrigatoria \"%s\" nao foi declarada; "
+            "ela deve armazenar o resultado final do programa",
+            VARIAVEL_FINAL);
+    }
+
     imprimir_tabela_simbolos();
     printf("\nPrograma sintaticamente correto\n");
 
@@ -747,6 +759,11 @@ void gerar_assembly_dasm(const char *fname) {
     char ln[TAC_LINE_LEN], dst[64], a[64], b[64], op[8];
     char lb[200][64]; int nl = 0;
     char nm[200][64]; int nn = 0;
+
+    /* garante que VARIAVEL_FINAL sempre ocupa $80 (primeiro slot da RAM) */
+    strncpy(nm[nn], VARIAVEL_FINAL, 63);
+    nm[nn][63] = '\0';
+    nn++;
 
 #define LIT(s) ((s)[0]&&(isdigit((unsigned char)(s)[0])||(s)[0]=='-'||(s)[0]=='+'||(s)[0]=='\''))
 #define VAL(s) ((s)[0]=='\''?(unsigned char)(s)[1]:(int)atof(s)&0xFF)
@@ -874,7 +891,12 @@ void gerar_assembly_dasm(const char *fname) {
 
     fprintf(f, "\nFIM_LOOP:\n    JMP FIM_LOOP\n\n    ORG $FFFC\n    .word START\n    .word START\n");
     fprintf(f, "\n; Mapa de memoria\n");
-    for (i = 0; i < nn; i++) fprintf(f, "; $%02X = %s\n", 0x80+i, nm[i]);
+    for (i = 0; i < nn; i++) {
+        if (strcmp(nm[i], VARIAVEL_FINAL) == 0)
+            fprintf(f, "; $%02X = %s  ; variavel final obrigatoria\n", ENDERECO_VARIAVEL_FINAL + i, nm[i]);
+        else
+            fprintf(f, "; $%02X = %s\n", ENDERECO_VARIAVEL_FINAL + i, nm[i]);
+    }
 
     fclose(f);
 end:

@@ -84,6 +84,11 @@ void yyerror(const char *s);
 void imprimir_codigo_objeto(void);
 void gerar_assembly_dasm(const char *filename);
 
+/* ===================== VARIAVEL FINAL OBRIGATORIA ============= */
+
+#define VARIAVEL_FINAL           "resultado"
+#define ENDERECO_VARIAVEL_FINAL  0x80
+
 /* ===================== TABELA DE SIMBOLOS ===================== */
 
 typedef struct {
@@ -344,7 +349,7 @@ void traduzir_instrucao_objeto(char *linha) {
 }
 
 
-#line 348 "y.tab.c"
+#line 353 "y.tab.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -467,7 +472,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 278 "translate.y"
+#line 283 "translate.y"
 
     char *strval;
     struct expr_s {
@@ -475,7 +480,7 @@ union YYSTYPE
         char tipo[20];
     } expr;
 
-#line 479 "y.tab.c"
+#line 484 "y.tab.c"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -566,7 +571,7 @@ typedef enum yysymbol_kind_t yysymbol_kind_t;
 
 
 /* Second part of user prologue.  */
-#line 286 "translate.y"
+#line 291 "translate.y"
 
 typedef struct expr_s Expr;
 
@@ -636,7 +641,7 @@ void gerar_negacao(Expr *res, Expr e) {
     strcpy(res->tipo, "elixir");
 }
 
-#line 640 "y.tab.c"
+#line 645 "y.tab.c"
 
 
 #ifdef short
@@ -1022,12 +1027,12 @@ static const yytype_int8 yytranslate[] =
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   377,   377,   381,   382,   386,   387,   388,   389,   393,
-     397,   409,   410,   411,   412,   416,   431,   438,   446,   430,
-     455,   462,   454,   468,   469,   473,   474,   475,   480,   486,
-     493,   479,   504,   510,   518,   523,   503,   535,   534,   549,
-     558,   559,   560,   561,   562,   563,   564,   565,   566,   567,
-     568,   569,   570,   571,   572,   573,   574,   575,   576,   577
+       0,   382,   382,   386,   387,   391,   392,   393,   394,   398,
+     402,   414,   415,   416,   417,   421,   436,   443,   451,   435,
+     460,   467,   459,   473,   474,   478,   479,   480,   485,   491,
+     498,   484,   509,   515,   523,   528,   508,   540,   539,   554,
+     563,   564,   565,   566,   567,   568,   569,   570,   571,   572,
+     573,   574,   575,   576,   577,   578,   579,   580,   581,   582
 };
 #endif
 
@@ -1691,16 +1696,16 @@ yyreduce:
   switch (yyn)
     {
   case 9: /* declaracao_variavel: tipo ID  */
-#line 393 "translate.y"
+#line 398 "translate.y"
               {
           if (inserir_tabela((yyvsp[0].strval), (yyvsp[-1].strval)))
               semantic_error(linha_atual, "variavel \"%s\" ja foi declarada", (yyvsp[0].strval));
       }
-#line 1700 "y.tab.c"
+#line 1705 "y.tab.c"
     break;
 
   case 10: /* declaracao_variavel: tipo ID ATRIBUICAO expressao  */
-#line 397 "translate.y"
+#line 402 "translate.y"
                                    {
           if (inserir_tabela((yyvsp[-2].strval), (yyvsp[-3].strval)))
               semantic_error(linha_atual, "variavel \"%s\" ja foi declarada", (yyvsp[-2].strval));
@@ -1710,35 +1715,35 @@ yyreduce:
                   (yyvsp[-2].strval), (yyvsp[-3].strval), (yyvsp[0].expr).tipo);
           add_tac("%s = %s", (yyvsp[-2].strval), (yyvsp[0].expr).name);
       }
-#line 1714 "y.tab.c"
+#line 1719 "y.tab.c"
     break;
 
   case 11: /* tipo: TIPO_CHUMBO  */
-#line 409 "translate.y"
+#line 414 "translate.y"
                        { (yyval.strval) = "chumbo"; }
-#line 1720 "y.tab.c"
+#line 1725 "y.tab.c"
     break;
 
   case 12: /* tipo: TIPO_MERCURIO  */
-#line 410 "translate.y"
+#line 415 "translate.y"
                        { (yyval.strval) = "mercurio"; }
-#line 1726 "y.tab.c"
+#line 1731 "y.tab.c"
     break;
 
   case 13: /* tipo: TIPO_ELIXIR  */
-#line 411 "translate.y"
+#line 416 "translate.y"
                        { (yyval.strval) = "elixir"; }
-#line 1732 "y.tab.c"
+#line 1737 "y.tab.c"
     break;
 
   case 14: /* tipo: TIPO_RUNA  */
-#line 412 "translate.y"
+#line 417 "translate.y"
                        { (yyval.strval) = "runa"; }
-#line 1738 "y.tab.c"
+#line 1743 "y.tab.c"
     break;
 
   case 15: /* atribuicao: ID ATRIBUICAO expressao  */
-#line 416 "translate.y"
+#line 421 "translate.y"
                               {
           char *tipoVar = getDataType((yyvsp[-2].strval));
           if (!tipoVar) {
@@ -1750,22 +1755,22 @@ yyreduce:
           }
           add_tac("%s = %s", (yyvsp[-2].strval), (yyvsp[0].expr).name);
       }
-#line 1754 "y.tab.c"
+#line 1759 "y.tab.c"
     break;
 
   case 16: /* $@1: %empty  */
-#line 431 "translate.y"
+#line 436 "translate.y"
       {
           verificar_booleano((yyvsp[-1].expr));
           char *lelse = novo_label();
           add_tac("ifFalse %s goto %s", (yyvsp[-1].expr).name, lelse);
           push_label(lelse);
       }
-#line 1765 "y.tab.c"
+#line 1770 "y.tab.c"
     break;
 
   case 17: /* $@2: %empty  */
-#line 438 "translate.y"
+#line 443 "translate.y"
       {
           char *lelse = pop_label();
           char *lend = novo_label();
@@ -1773,83 +1778,83 @@ yyreduce:
           add_tac("%s:", lelse);
           push_label(lend);
       }
-#line 1777 "y.tab.c"
+#line 1782 "y.tab.c"
     break;
 
   case 18: /* $@3: %empty  */
-#line 446 "translate.y"
+#line 451 "translate.y"
       {
           char *lend = pop_label();
           add_tac("%s:", lend);
       }
-#line 1786 "y.tab.c"
+#line 1791 "y.tab.c"
     break;
 
   case 20: /* $@4: %empty  */
-#line 455 "translate.y"
+#line 460 "translate.y"
       {
           verificar_booleano((yyvsp[-1].expr));
           char *lelse = novo_label();
           add_tac("ifFalse %s goto %s", (yyvsp[-1].expr).name, lelse);
           push_label(lelse);
       }
-#line 1797 "y.tab.c"
+#line 1802 "y.tab.c"
     break;
 
   case 21: /* $@5: %empty  */
-#line 462 "translate.y"
+#line 467 "translate.y"
       {
           char *lelse = pop_label();
           add_tac("goto %s", peek_label());
           add_tac("%s:", lelse);
       }
-#line 1807 "y.tab.c"
+#line 1812 "y.tab.c"
     break;
 
   case 28: /* $@6: %empty  */
-#line 480 "translate.y"
+#line 485 "translate.y"
       {
           char *lstart = novo_label();
           add_tac("%s:", lstart);
           push_label(lstart);
       }
-#line 1817 "y.tab.c"
+#line 1822 "y.tab.c"
     break;
 
   case 29: /* $@7: %empty  */
-#line 486 "translate.y"
+#line 491 "translate.y"
       {
           verificar_booleano((yyvsp[-1].expr));
           char *lend = novo_label();
           add_tac("ifFalse %s goto %s", (yyvsp[-1].expr).name, lend);
           push_label(lend);
       }
-#line 1828 "y.tab.c"
+#line 1833 "y.tab.c"
     break;
 
   case 30: /* $@8: %empty  */
-#line 493 "translate.y"
+#line 498 "translate.y"
       {
           char *lend = pop_label();
           char *lstart = pop_label();
           add_tac("goto %s", lstart);
           add_tac("%s:", lend);
       }
-#line 1839 "y.tab.c"
+#line 1844 "y.tab.c"
     break;
 
   case 32: /* $@9: %empty  */
-#line 504 "translate.y"
+#line 509 "translate.y"
       {
           char *lstart = novo_label();
           add_tac("%s:", lstart);
           push_label(lstart);
       }
-#line 1849 "y.tab.c"
+#line 1854 "y.tab.c"
     break;
 
   case 33: /* $@10: %empty  */
-#line 510 "translate.y"
+#line 515 "translate.y"
       {
           verificar_booleano((yyvsp[-1].expr));
           char *lend = novo_label();
@@ -1857,20 +1862,20 @@ yyreduce:
           push_label(lend);
           push_marca(tac_count);
       }
-#line 1861 "y.tab.c"
+#line 1866 "y.tab.c"
     break;
 
   case 34: /* $@11: %empty  */
-#line 518 "translate.y"
+#line 523 "translate.y"
       {
           int marca = pop_marca();
           mover_para_buffer_temporario(marca);
       }
-#line 1870 "y.tab.c"
+#line 1875 "y.tab.c"
     break;
 
   case 35: /* $@12: %empty  */
-#line 523 "translate.y"
+#line 528 "translate.y"
       {
           restaurar_buffer_temporario();
           char *lend = pop_label();
@@ -1878,31 +1883,31 @@ yyreduce:
           add_tac("goto %s", lstart);
           add_tac("%s:", lend);
       }
-#line 1882 "y.tab.c"
+#line 1887 "y.tab.c"
     break;
 
   case 37: /* $@13: %empty  */
-#line 535 "translate.y"
+#line 540 "translate.y"
       {
           char *lstart = novo_label();
           add_tac("%s:", lstart);
           push_label(lstart);
       }
-#line 1892 "y.tab.c"
+#line 1897 "y.tab.c"
     break;
 
   case 38: /* comando_catalisar: CATALISAR $@13 FACA lista_declaracoes FIM CATALISAR '(' expressao ')'  */
-#line 541 "translate.y"
+#line 546 "translate.y"
       {
           verificar_booleano((yyvsp[-1].expr));
           char *lstart = pop_label();
           add_tac("if %s goto %s", (yyvsp[-1].expr).name, lstart);
       }
-#line 1902 "y.tab.c"
+#line 1907 "y.tab.c"
     break;
 
   case 39: /* expressao: ID  */
-#line 549 "translate.y"
+#line 554 "translate.y"
          {
           char *t = getDataType((yyvsp[0].strval));
           if (!t) {
@@ -1912,131 +1917,131 @@ yyreduce:
           strcpy((yyval.expr).name, (yyvsp[0].strval));
           strcpy((yyval.expr).tipo, t);
       }
-#line 1916 "y.tab.c"
+#line 1921 "y.tab.c"
     break;
 
   case 40: /* expressao: NUM_INT  */
-#line 558 "translate.y"
+#line 563 "translate.y"
                    { strcpy((yyval.expr).name, (yyvsp[0].strval)); strcpy((yyval.expr).tipo, "chumbo"); }
-#line 1922 "y.tab.c"
+#line 1927 "y.tab.c"
     break;
 
   case 41: /* expressao: NUM_REAL  */
-#line 559 "translate.y"
+#line 564 "translate.y"
                    { strcpy((yyval.expr).name, (yyvsp[0].strval)); strcpy((yyval.expr).tipo, "mercurio"); }
-#line 1928 "y.tab.c"
+#line 1933 "y.tab.c"
     break;
 
   case 42: /* expressao: LIT_CHAR  */
-#line 560 "translate.y"
+#line 565 "translate.y"
                    { strcpy((yyval.expr).name, (yyvsp[0].strval)); strcpy((yyval.expr).tipo, "runa"); }
-#line 1934 "y.tab.c"
+#line 1939 "y.tab.c"
     break;
 
   case 43: /* expressao: VAL_VERDADE  */
-#line 561 "translate.y"
+#line 566 "translate.y"
                    { strcpy((yyval.expr).name, "1"); strcpy((yyval.expr).tipo, "elixir"); }
-#line 1940 "y.tab.c"
+#line 1945 "y.tab.c"
     break;
 
   case 44: /* expressao: VAL_FALSO  */
-#line 562 "translate.y"
+#line 567 "translate.y"
                    { strcpy((yyval.expr).name, "0"); strcpy((yyval.expr).tipo, "elixir"); }
-#line 1946 "y.tab.c"
+#line 1951 "y.tab.c"
     break;
 
   case 45: /* expressao: '(' expressao ')'  */
-#line 563 "translate.y"
+#line 568 "translate.y"
                              { (yyval.expr) = (yyvsp[-1].expr); }
-#line 1952 "y.tab.c"
+#line 1957 "y.tab.c"
     break;
 
   case 46: /* expressao: OP_NOT expressao  */
-#line 564 "translate.y"
+#line 569 "translate.y"
                              { gerar_negacao(&(yyval.expr), (yyvsp[0].expr)); }
-#line 1958 "y.tab.c"
+#line 1963 "y.tab.c"
     break;
 
   case 47: /* expressao: expressao OP_OR expressao  */
-#line 565 "translate.y"
+#line 570 "translate.y"
                                   { gerar_logico(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "||"); }
-#line 1964 "y.tab.c"
+#line 1969 "y.tab.c"
     break;
 
   case 48: /* expressao: expressao OP_AND expressao  */
-#line 566 "translate.y"
+#line 571 "translate.y"
                                   { gerar_logico(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "&&"); }
-#line 1970 "y.tab.c"
+#line 1975 "y.tab.c"
     break;
 
   case 49: /* expressao: expressao OP_GT expressao  */
-#line 567 "translate.y"
+#line 572 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), ">", 1); }
-#line 1976 "y.tab.c"
+#line 1981 "y.tab.c"
     break;
 
   case 50: /* expressao: expressao OP_LT expressao  */
-#line 568 "translate.y"
+#line 573 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "<", 1); }
-#line 1982 "y.tab.c"
+#line 1987 "y.tab.c"
     break;
 
   case 51: /* expressao: expressao OP_GE expressao  */
-#line 569 "translate.y"
+#line 574 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), ">=", 1); }
-#line 1988 "y.tab.c"
+#line 1993 "y.tab.c"
     break;
 
   case 52: /* expressao: expressao OP_LE expressao  */
-#line 570 "translate.y"
+#line 575 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "<=", 1); }
-#line 1994 "y.tab.c"
+#line 1999 "y.tab.c"
     break;
 
   case 53: /* expressao: expressao OP_EQ expressao  */
-#line 571 "translate.y"
+#line 576 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "==", 0); }
-#line 2000 "y.tab.c"
+#line 2005 "y.tab.c"
     break;
 
   case 54: /* expressao: expressao OP_NE expressao  */
-#line 572 "translate.y"
+#line 577 "translate.y"
                                   { gerar_comparacao(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "!=", 0); }
-#line 2006 "y.tab.c"
+#line 2011 "y.tab.c"
     break;
 
   case 55: /* expressao: expressao OP_SOMA expressao  */
-#line 573 "translate.y"
+#line 578 "translate.y"
                                   { gerar_aritmetica(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "+", 0); }
-#line 2012 "y.tab.c"
+#line 2017 "y.tab.c"
     break;
 
   case 56: /* expressao: expressao OP_SUB expressao  */
-#line 574 "translate.y"
+#line 579 "translate.y"
                                   { gerar_aritmetica(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "-", 0); }
-#line 2018 "y.tab.c"
+#line 2023 "y.tab.c"
     break;
 
   case 57: /* expressao: expressao OP_MULT expressao  */
-#line 575 "translate.y"
+#line 580 "translate.y"
                                   { gerar_aritmetica(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "*", 0); }
-#line 2024 "y.tab.c"
+#line 2029 "y.tab.c"
     break;
 
   case 58: /* expressao: expressao OP_DIV expressao  */
-#line 576 "translate.y"
+#line 581 "translate.y"
                                   { gerar_aritmetica(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "/", 0); }
-#line 2030 "y.tab.c"
+#line 2035 "y.tab.c"
     break;
 
   case 59: /* expressao: expressao OP_MOD expressao  */
-#line 577 "translate.y"
+#line 582 "translate.y"
                                   { gerar_aritmetica(&(yyval.expr), (yyvsp[-2].expr), (yyvsp[0].expr), "%", 1); }
-#line 2036 "y.tab.c"
+#line 2041 "y.tab.c"
     break;
 
 
-#line 2040 "y.tab.c"
+#line 2045 "y.tab.c"
 
       default: break;
     }
@@ -2229,7 +2234,7 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 580 "translate.y"
+#line 585 "translate.y"
 
 
 int inserir_tabela(const char *nome, const char *tipo) {
@@ -2333,6 +2338,13 @@ int main(int argc, char **argv) {
     fflush(stdout);
     yyparse();
 
+    if (getDataType(VARIAVEL_FINAL) == NULL) {
+        semantic_error(linha_atual,
+            "a variavel final obrigatoria \"%s\" nao foi declarada; "
+            "ela deve armazenar o resultado final do programa",
+            VARIAVEL_FINAL);
+    }
+
     imprimir_tabela_simbolos();
     printf("\nPrograma sintaticamente correto\n");
 
@@ -2400,6 +2412,11 @@ void gerar_assembly_dasm(const char *fname) {
     char ln[TAC_LINE_LEN], dst[64], a[64], b[64], op[8];
     char lb[200][64]; int nl = 0;
     char nm[200][64]; int nn = 0;
+
+    /* garante que VARIAVEL_FINAL sempre ocupa $80 (primeiro slot da RAM) */
+    strncpy(nm[nn], VARIAVEL_FINAL, 63);
+    nm[nn][63] = '\0';
+    nn++;
 
 #define LIT(s) ((s)[0]&&(isdigit((unsigned char)(s)[0])||(s)[0]=='-'||(s)[0]=='+'||(s)[0]=='\''))
 #define VAL(s) ((s)[0]=='\''?(unsigned char)(s)[1]:(int)atof(s)&0xFF)
@@ -2527,7 +2544,12 @@ void gerar_assembly_dasm(const char *fname) {
 
     fprintf(f, "\nFIM_LOOP:\n    JMP FIM_LOOP\n\n    ORG $FFFC\n    .word START\n    .word START\n");
     fprintf(f, "\n; Mapa de memoria\n");
-    for (i = 0; i < nn; i++) fprintf(f, "; $%02X = %s\n", 0x80+i, nm[i]);
+    for (i = 0; i < nn; i++) {
+        if (strcmp(nm[i], VARIAVEL_FINAL) == 0)
+            fprintf(f, "; $%02X = %s  ; variavel final obrigatoria\n", ENDERECO_VARIAVEL_FINAL + i, nm[i]);
+        else
+            fprintf(f, "; $%02X = %s\n", ENDERECO_VARIAVEL_FINAL + i, nm[i]);
+    }
 
     fclose(f);
 end:

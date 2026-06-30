@@ -133,7 +133,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 278 "translate.y"
+#line 283 "translate.y"
 
     char *strval;
     struct expr_s {
