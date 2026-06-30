@@ -17,7 +17,7 @@ void gerar_assembly_dasm(const char *filename);
 /* ===================== VARIAVEL FINAL OBRIGATORIA ============= */
 
 #define VARIAVEL_FINAL           "resultado"
-#define ENDERECO_VARIAVEL_FINAL  0x80
+#define ENDERECO_VARIAVEL_FINAL  0x81
 
 /* ===================== TABELA DE SIMBOLOS ===================== */
 
@@ -809,7 +809,7 @@ void gerar_assembly_dasm(const char *fname) {
     if (!f) { fprintf(stderr, "Erro: %s\n", fname); goto end; }
 
     fprintf(f, "    PROCESSOR 6502\n    INCLUDE \"vcs.h\"\n    INCLUDE \"macro.h\"\n\n");
-    fprintf(f, "    SEG.U RAM\n    ORG $80\n");
+    fprintf(f, "    SEG.U RAM\n    ORG $%02X\n", ENDERECO_VARIAVEL_FINAL);
     for (i = 0; i < nn; i++) fprintf(f, "%-12s ds 1\n", nm[i]);
     fprintf(f, "\n    SEG CODE\n    ORG $F000\n\nSTART:\n    CLEAN_START\n\n");
 
