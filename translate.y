@@ -17,7 +17,7 @@ void gerar_assembly_dasm(const char *filename);
 /* ===================== VARIAVEL FINAL OBRIGATORIA ============= */
 
 #define VARIAVEL_FINAL           "resultado"
-#define ENDERECO_VARIAVEL_FINAL  0x81
+#define ENDERECO_VARIAVEL_FINAL  0x85
 
 /* ===================== TABELA DE SIMBOLOS ===================== */
 

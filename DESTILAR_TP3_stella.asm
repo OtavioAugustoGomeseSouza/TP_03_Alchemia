@@ -3,9 +3,9 @@
     INCLUDE "macro.h"
 
     SEG.U RAM
-    ORG $80
-vida         ds 1
+    ORG $85
 resultado    ds 1
+vida         ds 1
 i            ds 1
 t0           ds 1
 t2           ds 1
@@ -75,9 +75,9 @@ FIM_LOOP:
     .word START
 
 ; Mapa de memoria
-; $80 = vida
-; $81 = resultado
-; $82 = i
-; $83 = t0
-; $84 = t2
-; $85 = t1
+; $85 = resultado  ; variavel final obrigatoria
+; $86 = vida
+; $87 = i
+; $88 = t0
+; $89 = t2
+; $8A = t1
