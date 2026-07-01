@@ -1,0 +1,8 @@
+|| Teste de erro semantico
+|| RESIDUO (%) exige operandos estritamente chumbo (int)
+|| mas taxa e do tipo mercurio (float)
+
+chumbo resultado <- 0
+mercurio taxa <- 3.14
+
+resultado <- taxa RESIDUO 2

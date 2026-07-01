@@ -1,0 +1,5 @@
+|| Teste de erro lexico
+|| O simbolo @ nao pertence ao alfabeto da linguagem Alchemia
+
+chumbo resultado <- 10
+resultado <- resultado FUSAO 5@2

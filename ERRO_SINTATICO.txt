@@ -1,0 +1,9 @@
+|| Teste de erro sintatico
+|| Faltam os parenteses obrigatorios ao redor da condicao do REAGIR
+
+chumbo resultado <- 0
+chumbo vida <- 100
+
+REAGIR vida DENSO 0 FACA
+    resultado <- vida FUSAO 10
+FIM REAGIR
